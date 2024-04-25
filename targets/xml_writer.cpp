@@ -207,6 +207,12 @@ void til::xml_writer::do_if_else_node(til::if_else_node * const node, int lvl) {
 
 //---------------------------------------------------------------------------
 
+void til::xml_writer::do_block_node(til::block_node * const node, int lvl) {
+  // TODO
+}
+
+//---------------------------------------------------------------------------
+
 void til::xml_writer::do_nullptr_node(til::nullptr_node * const node, int lvl) {
   // TODO
 }
