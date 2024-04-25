@@ -306,7 +306,7 @@ void til::postfix_writer::do_nullptr_node(til::nullptr_node * const node, int lv
 
 //---------------------------------------------------------------------------
 
-void til::postfix_writer::do_stack_alloc_node(til::block_node * const node, int lvl) {
+void til::postfix_writer::do_stack_alloc_node(til::stack_alloc_node * const node, int lvl) {
   // TODO
 }
 
