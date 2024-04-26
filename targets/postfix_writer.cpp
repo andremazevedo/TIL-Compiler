@@ -300,6 +300,12 @@ void til::postfix_writer::do_return_node(til::return_node * const node, int lvl)
 
 //---------------------------------------------------------------------------
 
+void til::postfix_writer::do_variable_declaration_node(til::variable_declaration_node * const node, int lvl) {
+  // TODO
+}
+
+//---------------------------------------------------------------------------
+
 void til::postfix_writer::do_nullptr_node(til::nullptr_node * const node, int lvl) {
   // TODO
 }

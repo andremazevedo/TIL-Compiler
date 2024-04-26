@@ -219,6 +219,12 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 
 //---------------------------------------------------------------------------
 
+void til::type_checker::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
+  // TODO
+}
+
+//---------------------------------------------------------------------------
+
 void til::type_checker::do_nullptr_node(til::nullptr_node *const node, int lvl) {
   // TODO
 }
