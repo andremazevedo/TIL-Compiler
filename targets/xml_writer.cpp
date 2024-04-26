@@ -233,6 +233,10 @@ void til::xml_writer::do_nullptr_node(til::nullptr_node * const node, int lvl) {
   // TODO
 }
 
+void til::xml_writer::do_index_node(til::index_node * const node, int lvl) {
+  // TODO
+}
+
 void til::xml_writer::do_stack_alloc_node(til::stack_alloc_node * const node, int lvl) {
   // TODO
 }

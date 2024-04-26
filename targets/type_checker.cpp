@@ -223,6 +223,10 @@ void til::type_checker::do_nullptr_node(til::nullptr_node *const node, int lvl) 
   // TODO
 }
 
+void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
+  // TODO
+}
+
 void til::type_checker::do_stack_alloc_node(til::stack_alloc_node *const node, int lvl) {
   // TODO
 }
