@@ -157,6 +157,12 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node, int
 
 //---------------------------------------------------------------------------
 
+void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
+  // TODO
+}
+
+//---------------------------------------------------------------------------
+
 void til::type_checker::do_program_node(til::program_node *const node, int lvl) {
   // EMPTY
 }
@@ -185,6 +191,14 @@ void til::type_checker::do_while_node(til::while_node *const node, int lvl) {
   node->condition()->accept(this, lvl + 4);
 }
 
+void til::type_checker::do_stop_node(til::stop_node *const node, int lvl) {
+  // TODO
+}
+
+void til::type_checker::do_next_node(til::next_node *const node, int lvl) {
+  // TODO
+}
+
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_if_node(til::if_node *const node, int lvl) {
@@ -197,17 +211,11 @@ void til::type_checker::do_if_else_node(til::if_else_node *const node, int lvl) 
 
 //---------------------------------------------------------------------------
 
-void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
+void til::type_checker::do_function_definition_node(til::function_definition_node *const node, int lvl) {
   // TODO
 }
 
-//---------------------------------------------------------------------------
-
-void til::type_checker::do_stop_node(til::stop_node *const node, int lvl) {
-  // TODO
-}
-
-void til::type_checker::do_next_node(til::next_node *const node, int lvl) {
+void til::type_checker::do_function_call_node(til::function_call_node *const node, int lvl) {
   // TODO
 }
 

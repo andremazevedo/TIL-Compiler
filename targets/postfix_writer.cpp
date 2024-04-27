@@ -169,6 +169,12 @@ void til::postfix_writer::do_assignment_node(cdk::assignment_node * const node, 
 
 //---------------------------------------------------------------------------
 
+void til::postfix_writer::do_block_node(til::block_node * const node, int lvl) {
+  // TODO
+}
+
+//---------------------------------------------------------------------------
+
 void til::postfix_writer::do_program_node(til::program_node * const node, int lvl) {
   // Note that Simple doesn't have functions. Thus, it doesn't need
   // a function node. However, it must start in the main function.
@@ -251,6 +257,14 @@ void til::postfix_writer::do_while_node(til::while_node * const node, int lvl) {
   _pf.LABEL(mklbl(lbl2));
 }
 
+void til::postfix_writer::do_stop_node(til::stop_node * const node, int lvl) {
+  // TODO
+}
+
+void til::postfix_writer::do_next_node(til::next_node * const node, int lvl) {
+  // TODO
+}
+
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_if_node(til::if_node * const node, int lvl) {
@@ -278,17 +292,11 @@ void til::postfix_writer::do_if_else_node(til::if_else_node * const node, int lv
 
 //---------------------------------------------------------------------------
 
-void til::postfix_writer::do_block_node(til::block_node * const node, int lvl) {
+void til::postfix_writer::do_function_definition_node(til::function_definition_node * const node, int lvl) {
   // TODO
 }
 
-//---------------------------------------------------------------------------
-
-void til::postfix_writer::do_stop_node(til::stop_node * const node, int lvl) {
-  // TODO
-}
-
-void til::postfix_writer::do_next_node(til::next_node * const node, int lvl) {
+void til::postfix_writer::do_function_call_node(til::function_call_node * const node, int lvl) {
   // TODO
 }
 
