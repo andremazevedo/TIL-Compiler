@@ -172,17 +172,17 @@ void til::type_checker::do_evaluation_node(til::evaluation_node *const node, int
 }
 
 void til::type_checker::do_print_node(til::print_node *const node, int lvl) {
-  node->argument()->accept(this, lvl + 2);
+  // node->argument()->accept(this, lvl + 2);
 }
 
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_read_node(til::read_node *const node, int lvl) {
-  try {
-    node->argument()->accept(this, lvl);
-  } catch (const std::string &id) {
-    throw "undeclared variable '" + id + "'";
-  }
+  // try {
+  //   node->argument()->accept(this, lvl);
+  // } catch (const std::string &id) {
+  //   throw "undeclared variable '" + id + "'";
+  // }
 }
 
 //---------------------------------------------------------------------------

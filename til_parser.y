@@ -48,6 +48,7 @@
 %type <node> stmt program
 %type <sequence> list
 %type <expression> expr
+%type <sequence> expressions
 %type <lvalue> lval
 
 %{
@@ -63,8 +64,7 @@ list : stmt      { $$ = new cdk::sequence_node(LINE, $1); }
      ;
 
 stmt : expr ';'                         { $$ = new til::evaluation_node(LINE, $1); }
-     | tPRINT expr ';'                  { $$ = new til::print_node(LINE, $2); }
-     | tREAD lval ';'                   { $$ = new til::read_node(LINE, $2); }
+     | tPRINT expressions ';'           { $$ = new til::print_node(LINE, $2); }
      | tWHILE '(' expr ')' stmt         { $$ = new til::while_node(LINE, $3, $5); }
      | tIF '(' expr ')' stmt %prec tIFX { $$ = new til::if_node(LINE, $3, $5); }
      | tIF '(' expr ')' stmt tELSE stmt { $$ = new til::if_else_node(LINE, $3, $5, $7); }
@@ -89,7 +89,12 @@ expr : tINTEGER              { $$ = new cdk::integer_node(LINE, $1); }
      | '(' expr ')'          { $$ = $2; }
      | lval                  { $$ = new cdk::rvalue_node(LINE, $1); }
      | lval '=' expr         { $$ = new cdk::assignment_node(LINE, $1, $3); }
+     | tREAD                 { $$ = new til::read_node(LINE); }
      ;
+
+expressions : expr             { $$ = new cdk::sequence_node(LINE, $1); }
+            | expressions expr { $$ = new cdk::sequence_node(LINE, $2, $1); }
+            ;
 
 lval : tIDENTIFIER             { $$ = new cdk::variable_node(LINE, $1); }
      ;
