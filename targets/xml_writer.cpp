@@ -138,9 +138,9 @@ void til::xml_writer::do_block_node(til::block_node * const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::xml_writer::do_program_node(til::program_node * const node, int lvl) {
-  openTag(node, lvl);
-  node->statements()->accept(this, lvl + 4);
-  closeTag(node, lvl);
+  // openTag(node, lvl);
+  // node->statements()->accept(this, lvl + 4);
+  // closeTag(node, lvl);
 }
 
 //---------------------------------------------------------------------------
