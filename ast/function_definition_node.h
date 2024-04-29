@@ -20,7 +20,7 @@ namespace til {
       type(funType);
     }
 
-    cdk::basic_node *arguments() { return _arguments; }
+    cdk::sequence_node *arguments() { return _arguments; }
 
     cdk::sequence_node *declarations() { return _declarations; }
 
