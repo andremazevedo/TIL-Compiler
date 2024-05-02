@@ -32,9 +32,15 @@
   cdk::lvalue_node     *lvalue;
 };
 
+%token tTYPE_INT tTYPE_DOUBLE tTYPE_STRING tTYPE_VOID
+%token tEXTERNAL tFORWARD tPUBLIC tVAR
+%token tBLOCK tIF tLOOP tSTOP tNEXT tRETURN tPRINT tPRINTLN
+%token tREAD tNULL tSET tINDEX tOBJECTS tSIZEOF tFUNCTION
+%token tPROGRAM
+%token tLE tGE tEQ tNE tAND tOR 
+
 %token <i> tINTEGER
 %token <s> tIDENTIFIER tSTRING
-%token tLOOP tIF tPRINT tREAD tBEGIN tEND
 
 %nonassoc tIFX
 %nonassoc tELSE
