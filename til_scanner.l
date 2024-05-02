@@ -13,74 +13,131 @@
 #define yyerror LexerError
 %}
 
-%x X_COMMENT X_STRING X_NULL X_BACKSLASH
+%x X_COMMENT
+%x X_HEX_INT
+%x X_STRING X_NULL X_BACKSLASH 
 
 %%
   yydebug=1; set_debug(1);
 
   /* comments */
-"//".*$                 ;
+";".*$                ;
 
-"/*"                   yy_push_state(X_COMMENT);
-<X_COMMENT>"/*"        yy_push_state(X_COMMENT);
-<X_COMMENT>"*/"        yy_pop_state();
-<X_COMMENT>.|\n        ;
+"/*"                  yy_push_state(X_COMMENT);
+<X_COMMENT>"/*"       yy_push_state(X_COMMENT);
+<X_COMMENT>"*/"       yy_pop_state();
+<X_COMMENT>.|\n       ;
 
   /* types */
-"int"                  return tTYPE_INT;
-"double"               return tTYPE_DOUBLE;
-"string"               return tTYPE_STRING;
-"void"                 return tTYPE_VOID;
+"int"                 return tTYPE_INT;
+"double"              return tTYPE_DOUBLE;
+"string"              return tTYPE_STRING;
+"void"                return tTYPE_VOID;
 
   /* statements */
-"external"             return tEXTERNAL;
-"forward"              return tFORWARD;
-"public"               return tPUBLIC;
-"var"                  return tVAR;
+"external"            return tEXTERNAL;
+"forward"             return tFORWARD;
+"public"              return tPUBLIC;
+"var"                 return tVAR;
 
   /* instructions */
-"block"                return tBLOCK;
-"if"                   return tIF;
-"loop"                 return tLOOP;
-"stop"                 return tSTOP;
-"next"                 return tNEXT;
-"return"               return tRETURN;
-"print"                return tPRINT;
-"println"              return tPRINTLN;
+"block"               return tBLOCK;
+"if"                  return tIF;
+"loop"                return tLOOP;
+"stop"                return tSTOP;
+"next"                return tNEXT;
+"return"              return tRETURN;
+"print"               return tPRINT;
+"println"             return tPRINTLN;
 
   /* expressions */
-"read"                 return tREAD;
-"null"                 return tNULL;
-"set"                  return tSET;
-"index"                return tINDEX;
-"objects"              return tOBJECTS;
-"sizeof"               return tSIZEOF;
-"function"             return tFUNCTION;
+"read"                return tREAD;
+"null"                return tNULL;
+"set"                 return tSET;
+"index"               return tINDEX;
+"objects"             return tOBJECTS;
+"sizeof"              return tSIZEOF;
+"function"            return tFUNCTION;
 
   /* others */
-"program"              return tPROGRAM;
+"program"               return tPROGRAM;
 
   /* expressions operators */
-[-+?*/%<>~]            return *yytext;
-"<="                   return tLE;
-">="                   return tGE;
-"=="                   return tEQ;
-"!="                   return tNE;
-"&&"                   return tAND;
-"||"                   return tOR;
+[-+?*/%<>~]           return *yytext;
+"<="                  return tLE;
+">="                  return tGE;
+"=="                  return tEQ;
+"!="                  return tNE;
+"&&"                  return tAND;
+"||"                  return tOR;
 
   /* delimiters */
-[()]                   return *yytext;
+[()]                  return *yytext;
 
   /* identifiers */
-[A-Za-z][A-Za-z0-9]*   yylval.s = new std::string(yytext); return tIDENTIFIER;
+[A-Za-z][A-Za-z0-9]*  yylval.s = new std::string(yytext); return tIDENTIFIER;
 
   /* literals integers*/
-  /* TODO */
-[0-9]+                 yylval.i = strtol(yytext, nullptr, 10); return tINTEGER;
+[1-9][0-9]*                             { 
+                                          try {
+                                            yylval.i = std::stoi(yytext); 
+                                            return tINTEGER;
+                                          }
+                                          catch (const std::out_of_range& e) {
+                                            std::cerr << "error: line " << lineno() << ": integer literal overflow" << std::endl; 
+                                            exit(1);
+                                          }
+                                        }
+0                                       yylval.i = std::stoi(yytext); return tINTEGER;
+0[0-9]+                                 std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
+
+"0x"                                    yy_push_state(X_HEX_INT);
+<X_HEX_INT>[1-9A-Fa-f][0-9A-Fa-f]*      { 
+                                          try {
+                                            yylval.i = std::stoi(yytext, nullptr, 16); 
+                                            yy_pop_state(); 
+                                            return tINTEGER;
+                                          }
+                                          catch (const std::out_of_range& e) {
+                                            std::cerr << "error: line " << lineno() << ": integer literal overflow" << std::endl; 
+                                            exit(1);
+                                          }
+                                        }
+<X_HEX_INT>0                            yylval.i = std::stoi(yytext, nullptr, 16); yy_pop_state();
+<X_HEX_INT>0[0-9]+                      std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
+<X_HEX_INT>.|\n                         std::cerr << "error: line " << lineno() << ": invalid hexadecimal literal" << std::endl; exit(1);
 
   /* literals doubles */
-  /* TODO */
+[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?        {
+                                          try {
+                                            yylval.d = std::stod(yytext); 
+                                            return tDOUBLE;
+                                          }
+                                          catch (const std::out_of_range& e) {
+                                            std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
+                                            exit(1);
+                                          }
+                                        }
+[0-9]+\.[0-9]*([Ee][-+]?[0-9]+)?        {
+                                          try {
+                                            yylval.d = std::stod(yytext); 
+                                            return tDOUBLE;
+                                          }
+                                          catch (const std::out_of_range& e) {
+                                            std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
+                                            exit(1);
+                                          }
+                                        }
+[0-9]+([Ee][-+]?[0-9]+)                 {
+                                          try {
+                                            yylval.d = std::stod(yytext); 
+                                            return tDOUBLE;
+                                          }
+                                          catch (const std::out_of_range& e) {
+                                            std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
+                                            exit(1);
+                                          }
+                                        }
 
   /* literals strings*/
 \"                     yy_push_state(X_STRING); yylval.s = new std::string("");
