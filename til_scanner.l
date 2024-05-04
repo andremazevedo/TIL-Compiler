@@ -4,10 +4,14 @@
 %{ 
 // make relevant includes before including the parser's tab file
 #include <string>
+#include <sstream>
 #include <cdk/ast/sequence_node.h>
 #include <cdk/ast/expression_node.h>
 #include <cdk/ast/lvalue_node.h>
 #include "til_parser.tab.h"
+
+// output stream for building string literals
+static std::ostringstream strlit;
 
 // don't change this
 #define yyerror LexerError
@@ -15,7 +19,7 @@
 
 %x X_COMMENT
 %x X_HEX_INT
-%x X_STRING X_NULL X_BACKSLASH 
+%x X_STRING X_BACKSLASH X_NULL
 
 %%
   yydebug=1; set_debug(1);
@@ -140,33 +144,45 @@
                                         }
 
   /* literals strings*/
-\"                            yy_push_state(X_STRING); yylval.s = new std::string("");
-<X_STRING>\\0                 yy_push_state(X_NULL);
+\"                            yy_push_state(X_STRING);
 <X_STRING>\\                  yy_push_state(X_BACKSLASH);
-<X_STRING>\"                  yy_pop_state(); return tSTRING;
+<X_STRING>\"                  {
+                                yylval.s = new std::string(strlit.str());
+                                strlit.str("");
+                                yy_pop_state();
+                                return tSTRING;
+                              }
 <X_STRING>\0                  yyerror("null in string");
-<X_STRING>.                   *yylval.s += yytext;
+<X_STRING>.                   strlit << *yytext;
 <X_STRING>\n                  yyerror("newline in string");
 
-<X_NULL>\"                    yy_pop_state(); yy_pop_state(); return tSTRING;
+<X_BACKSLASH>0                yy_push_state(X_NULL);
+<X_BACKSLASH>t                strlit << '\t'; yy_pop_state();
+<X_BACKSLASH>n                strlit << '\n'; yy_pop_state();
+<X_BACKSLASH>r                strlit << '\r'; yy_pop_state();
+<X_BACKSLASH>\"               strlit << '\"'; yy_pop_state();
+<X_BACKSLASH>\\               strlit << '\\'; yy_pop_state();
+<X_BACKSLASH>[0-7]{1,3}       {
+                                strlit << (char)(unsigned char)std::stoi(yytext, nullptr, 8);
+                                yy_pop_state();
+                              }
+<X_BACKSLASH>\0               yyerror("null in string");
+<X_BACKSLASH>.                strlit << *yytext; yy_pop_state();
+<X_BACKSLASH>\n               yyerror("newline in string");
+
+<X_NULL>\"                    {
+                                yylval.s = new std::string(strlit.str());
+                                strlit.str("");
+                                yy_pop_state();
+                                yy_pop_state();
+                                yy_pop_state();
+                                return tSTRING;
+                              }
 <X_NULL>\\\"                  ;
 <X_NULL>\\\\                  ;
 <X_NULL>\0                    yyerror("null in string");
 <X_NULL>.                     ;
 <X_NULL>\n                    yyerror("newline in string");
-
-<X_BACKSLASH>t                *yylval.s += yytext; yy_pop_state();
-<X_BACKSLASH>n                *yylval.s += yytext; yy_pop_state();
-<X_BACKSLASH>r                *yylval.s += yytext; yy_pop_state();
-<X_BACKSLASH>\"               *yylval.s += yytext; yy_pop_state();
-<X_BACKSLASH>\\               *yylval.s += yytext; yy_pop_state();
-<X_BACKSLASH>[0-7]{1,3}       {
-                                *yylval.s += (char)(unsigned char)std::stoi(yytext, nullptr, 8); 
-                                yy_pop_state();
-                              }
-<X_BACKSLASH>\0               yyerror("null in string");
-<X_BACKSLASH>.                yyerror("TODO");
-<X_BACKSLASH>\n               yyerror("newline in string");
 
 [-()<>=+*/%;{}.]      return *yytext;
 
