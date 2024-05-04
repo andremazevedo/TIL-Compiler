@@ -15,6 +15,26 @@ static std::ostringstream strlit;
 
 // don't change this
 #define yyerror LexerError
+
+int stringToInteger(const std::string &str, int base) {
+  try {
+    return std::stoi(str, nullptr, base);
+  }
+  catch (const std::out_of_range& e) {
+    std::cerr << "error: line " << lineno() << ": integer literal overflow" << std::endl; 
+    exit(1);
+  }
+}
+
+double stringToDouble(const std::string &str) {
+  try {
+    return std::stod(str);
+  }
+  catch (const std::out_of_range& e) {
+    std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
+    exit(1);
+  }
+}
 %}
 
 %x X_COMMENT
@@ -25,7 +45,7 @@ static std::ostringstream strlit;
   yydebug=1; set_debug(1);
 
   /* comments */
-";".*$                ;
+;.*$                ;
 
 "/*"                  yy_push_state(X_COMMENT);
 <X_COMMENT>"/*"       yy_push_state(X_COMMENT);
@@ -82,66 +102,18 @@ static std::ostringstream strlit;
 [A-Za-z][A-Za-z0-9]*  yylval.s = new std::string(yytext); return tIDENTIFIER;
 
   /* literals integers*/
-[1-9][0-9]*                             {
-                                          try {
-                                            yylval.i = std::stoi(yytext);
-                                            return tINTEGER;
-                                          }
-                                          catch (const std::out_of_range& e) {
-                                            std::cerr << "error: line " << lineno() << ": integer literal overflow" << std::endl; 
-                                            exit(1);
-                                          }
-                                        }
-0                                       yylval.i = std::stoi(yytext); return tINTEGER;
+[1-9][0-9]*                             yylval.i = stringToInteger(yytext, 10); return tINTEGER;
+0                                       yylval.i = stringToInteger(yytext, 10); return tINTEGER;
 0[0-9]+                                 std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
 
 "0x"                                    yy_push_state(X_HEX_INT);
-<X_HEX_INT>[1-9A-Fa-f][0-9A-Fa-f]*      {
-                                          try {
-                                            yylval.i = std::stoi(yytext, nullptr, 16);
-                                            yy_pop_state(); 
-                                            return tINTEGER;
-                                          }
-                                          catch (const std::out_of_range& e) {
-                                            std::cerr << "error: line " << lineno() << ": integer literal overflow" << std::endl; 
-                                            exit(1);
-                                          }
-                                        }
-<X_HEX_INT>0                            yylval.i = std::stoi(yytext, nullptr, 16); yy_pop_state(); return tINTEGER;
-<X_HEX_INT>0[0-9A-Fa-f]+                std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
+<X_HEX_INT>[0-9A-Fa-f]+                 yylval.i = stringToInteger(yytext, 16); yy_pop_state(); return tINTEGER;
 <X_HEX_INT>.|\n                         std::cerr << "error: line " << lineno() << ": invalid hexadecimal literal" << std::endl; exit(1);
 
   /* literals doubles */
-[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?        {
-                                          try {
-                                            yylval.d = std::stod(yytext);
-                                            return tDOUBLE;
-                                          }
-                                          catch (const std::out_of_range& e) {
-                                            std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
-                                            exit(1);
-                                          }
-                                        }
-[0-9]+\.[0-9]*([Ee][-+]?[0-9]+)?        {
-                                          try {
-                                            yylval.d = std::stod(yytext);
-                                            return tDOUBLE;
-                                          }
-                                          catch (const std::out_of_range& e) {
-                                            std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
-                                            exit(1);
-                                          }
-                                        }
-[0-9]+([Ee][-+]?[0-9]+)                 {
-                                          try {
-                                            yylval.d = std::stod(yytext);
-                                            return tDOUBLE;
-                                          }
-                                          catch (const std::out_of_range& e) {
-                                            std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
-                                            exit(1);
-                                          }
-                                        }
+[0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?        yylval.d = stringToDouble(yytext); return tDOUBLE;
+[0-9]+\.[0-9]*([Ee][-+]?[0-9]+)?        yylval.d = stringToDouble(yytext); return tDOUBLE;
+[0-9]+([Ee][-+]?[0-9]+)                 yylval.d = stringToDouble(yytext); return tDOUBLE;
 
   /* literals strings*/
 \"                            yy_push_state(X_STRING);
