@@ -78,9 +78,9 @@
 [A-Za-z][A-Za-z0-9]*  yylval.s = new std::string(yytext); return tIDENTIFIER;
 
   /* literals integers*/
-[1-9][0-9]*                             { 
+[1-9][0-9]*                             {
                                           try {
-                                            yylval.i = std::stoi(yytext); 
+                                            yylval.i = std::stoi(yytext);
                                             return tINTEGER;
                                           }
                                           catch (const std::out_of_range& e) {
@@ -92,9 +92,9 @@
 0[0-9]+                                 std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
 
 "0x"                                    yy_push_state(X_HEX_INT);
-<X_HEX_INT>[1-9A-Fa-f][0-9A-Fa-f]*      { 
+<X_HEX_INT>[1-9A-Fa-f][0-9A-Fa-f]*      {
                                           try {
-                                            yylval.i = std::stoi(yytext, nullptr, 16); 
+                                            yylval.i = std::stoi(yytext, nullptr, 16);
                                             yy_pop_state(); 
                                             return tINTEGER;
                                           }
@@ -103,14 +103,14 @@
                                             exit(1);
                                           }
                                         }
-<X_HEX_INT>0                            yylval.i = std::stoi(yytext, nullptr, 16); yy_pop_state();
-<X_HEX_INT>0[0-9]+                      std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
+<X_HEX_INT>0                            yylval.i = std::stoi(yytext, nullptr, 16); yy_pop_state(); return tINTEGER;
+<X_HEX_INT>0[0-9A-Fa-f]+                std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
 <X_HEX_INT>.|\n                         std::cerr << "error: line " << lineno() << ": invalid hexadecimal literal" << std::endl; exit(1);
 
   /* literals doubles */
 [0-9]*\.[0-9]+([Ee][-+]?[0-9]+)?        {
                                           try {
-                                            yylval.d = std::stod(yytext); 
+                                            yylval.d = std::stod(yytext);
                                             return tDOUBLE;
                                           }
                                           catch (const std::out_of_range& e) {
@@ -120,7 +120,7 @@
                                         }
 [0-9]+\.[0-9]*([Ee][-+]?[0-9]+)?        {
                                           try {
-                                            yylval.d = std::stod(yytext); 
+                                            yylval.d = std::stod(yytext);
                                             return tDOUBLE;
                                           }
                                           catch (const std::out_of_range& e) {
@@ -130,7 +130,7 @@
                                         }
 [0-9]+([Ee][-+]?[0-9]+)                 {
                                           try {
-                                            yylval.d = std::stod(yytext); 
+                                            yylval.d = std::stod(yytext);
                                             return tDOUBLE;
                                           }
                                           catch (const std::out_of_range& e) {
@@ -140,20 +140,39 @@
                                         }
 
   /* literals strings*/
-\"                     yy_push_state(X_STRING); yylval.s = new std::string("");
-  /* <X_STRING>\\0           yy_push_state(X_NULL); */
-  /* <X_STRING>\\           yy_push_state(X_BACKSLASH); */
-<X_STRING>\"           yy_pop_state(); return tSTRING;
-<X_STRING>\\\"         *yylval.s += yytext + 1;
-<X_STRING>\\\\         *yylval.s += yytext + 1;
-<X_STRING>.            *yylval.s += yytext;
-<X_STRING>\n           yyerror("newline in string");
+\"                            yy_push_state(X_STRING); yylval.s = new std::string("");
+<X_STRING>\\0                 yy_push_state(X_NULL);
+<X_STRING>\\                  yy_push_state(X_BACKSLASH);
+<X_STRING>\"                  yy_pop_state(); return tSTRING;
+<X_STRING>\0                  yyerror("null in string");
+<X_STRING>.                   *yylval.s += yytext;
+<X_STRING>\n                  yyerror("newline in string");
 
-[-()<>=+*/%;{}.]       return *yytext;
+<X_NULL>\"                    yy_pop_state(); yy_pop_state(); return tSTRING;
+<X_NULL>\\\"                  ;
+<X_NULL>\\\\                  ;
+<X_NULL>\0                    yyerror("null in string");
+<X_NULL>.                     ;
+<X_NULL>\n                    yyerror("newline in string");
+
+<X_BACKSLASH>t                *yylval.s += yytext; yy_pop_state();
+<X_BACKSLASH>n                *yylval.s += yytext; yy_pop_state();
+<X_BACKSLASH>r                *yylval.s += yytext; yy_pop_state();
+<X_BACKSLASH>\"               *yylval.s += yytext; yy_pop_state();
+<X_BACKSLASH>\\               *yylval.s += yytext; yy_pop_state();
+<X_BACKSLASH>[0-7]{1,3}       {
+                                *yylval.s += (char)(unsigned char)std::stoi(yytext, nullptr, 8); 
+                                yy_pop_state();
+                              }
+<X_BACKSLASH>\0               yyerror("null in string");
+<X_BACKSLASH>.                yyerror("TODO");
+<X_BACKSLASH>\n               yyerror("newline in string");
+
+[-()<>=+*/%;{}.]      return *yytext;
 
   /* whitespaces */
-[\n\r \t]+             ;
+[\n\r \t]+            ;
 
-.                      yyerror("Unknown character");
+.                     yyerror("Unknown character");
 
 %%
