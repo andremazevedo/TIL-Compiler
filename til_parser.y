@@ -156,19 +156,25 @@ stmt : expression ';'                         { $$ = new til::evaluation_node(LI
 
 expression : tINTEGER                    { $$ = new cdk::integer_node(LINE, $1); }
            | tSTRING                     { $$ = new cdk::string_node(LINE, $1); }
+           /* UNARY EXPRESSION */
            | '-' expression %prec tUNARY { $$ = new cdk::unary_minus_node(LINE, $2); }
            | '+' expression %prec tUNARY { $$ = new cdk::unary_plus_node(LINE, $2); }
-           | expression '+' expression   { $$ = new cdk::add_node(LINE, $1, $3); }
-           | expression '-' expression   { $$ = new cdk::sub_node(LINE, $1, $3); }
-           | expression '*' expression   { $$ = new cdk::mul_node(LINE, $1, $3); }
-           | expression '/' expression   { $$ = new cdk::div_node(LINE, $1, $3); }
-           | expression '%' expression   { $$ = new cdk::mod_node(LINE, $1, $3); }
-           | expression '<' expression   { $$ = new cdk::lt_node(LINE, $1, $3); }
-           | expression '>' expression   { $$ = new cdk::gt_node(LINE, $1, $3); }
-           | expression tGE expression   { $$ = new cdk::ge_node(LINE, $1, $3); }
-           | expression tLE expression   { $$ = new cdk::le_node(LINE, $1, $3); }
-           | expression tNE expression   { $$ = new cdk::ne_node(LINE, $1, $3); }
-           | expression tEQ expression   { $$ = new cdk::eq_node(LINE, $1, $3); }
+           /* arithmetic expressions */
+           | '(' '+' expression expression ')'  { $$ = new cdk::add_node(LINE, $3, $4); }
+           | '(' '-' expression expression ')'  { $$ = new cdk::sub_node(LINE, $3, $4); }
+           | '(' '*' expression expression ')'  { $$ = new cdk::mul_node(LINE, $3, $4); }
+           | '(' '/' expression expression ')'  { $$ = new cdk::div_node(LINE, $3, $4); }
+           | '(' '%' expression expression ')'  { $$ = new cdk::mod_node(LINE, $3, $4); }
+           /* logical expressions */
+           | '(' '<' expression expression ')'  { $$ = new cdk::lt_node(LINE, $3, $4); }
+           | '(' '>' expression expression ')'  { $$ = new cdk::gt_node(LINE, $3, $4); }
+           | '(' tLE expression expression ')'  { $$ = new cdk::le_node(LINE, $3, $4); }
+           | '(' tGE expression expression ')'  { $$ = new cdk::ge_node(LINE, $3, $4); }
+           | '(' tEQ expression expression ')'  { $$ = new cdk::eq_node(LINE, $3, $4); }
+           | '(' tNE expression expression ')'  { $$ = new cdk::ne_node(LINE, $3, $4); }
+           /* logical expressions */
+           | '(' tAND expression expression ')' { $$ = new cdk::and_node(LINE, $3, $4); }
+           | '(' tOR expression expression ')'  { $$ = new cdk::or_node (LINE, $3, $4); }
            | '(' expression ')'          { $$ = $2; }
            | lval                        { $$ = new cdk::rvalue_node(LINE, $1); }
            | lval '=' expression         { $$ = new cdk::assignment_node(LINE, $1, $3); }
