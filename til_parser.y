@@ -55,9 +55,9 @@
 %left '*' '/' '%'
 %nonassoc tUNARY
 
-%type <basic> declaration var_decla fun_decla program stmt
+%type <basic> declaration var_decla fun_decla program instruction
 %type <expression> expression function
-%type <sequence> file declarations expressions fun_declas list
+%type <sequence> file declarations expressions fun_declas instructions
 %type <lvalue> lval
 
 %type <i> qualifier
@@ -129,33 +129,36 @@ data_type : tTYPE_INT                        { $$ = cdk::primitive_type::create(
 
 
 
-
-
-
-
-block : /* empty */                 { $$ = new til::block_node(LINE, nullptr, nullptr); }
-      | '(' tBLOCK declarations ')' { $$ = new til::block_node(LINE, $3, nullptr); }
-      | '(' tBLOCK list ')'         { $$ = new til::block_node(LINE, nullptr, $3); }
-      | declarations                { $$ = new til::block_node(LINE, $1, nullptr); }
-      | list                        { $$ = new til::block_node(LINE, nullptr, $1); }
+block : declarations              { $$ = new til::block_node(LINE, $1, nullptr); }
+      | instructions              { $$ = new til::block_node(LINE, nullptr, $1); }
+      | declarations instructions { $$ = new til::block_node(LINE, $1, $2); }
       ;
 
-list : stmt      { $$ = new cdk::sequence_node(LINE, $1); }
-     | list stmt { $$ = new cdk::sequence_node(LINE, $2, $1); }
-     ;
+instructions : instruction              { $$ = new cdk::sequence_node(LINE, $1); }
+             | instructions instruction { $$ = new cdk::sequence_node(LINE, $2, $1); }
+             ;
 
-stmt : expression ';'                         { $$ = new til::evaluation_node(LINE, $1); }
-     | '(' tPRINT expressions ')'             { $$ = new til::print_node(LINE, $3); }
-     | '(' tPRINTLN expressions ')'           { $$ = new til::print_node(LINE, $3, true); }
-     | tLOOP '(' expression ')' stmt          { $$ = new til::loop_node(LINE, $3, $5); }
-     | tIF '(' expression ')' stmt %prec tIFX { $$ = new til::if_node(LINE, $3, $5); }
-     | tIF '(' expression ')' stmt tELSE stmt { $$ = new til::if_else_node(LINE, $3, $5, $7); }
-     | '{' list '}'                     { $$ = $2; }
-     | '(' tRETURN expression ')'             { $$ = new til::return_node(LINE, $3); }
-     ;
+instruction : '(' tBLOCK block ')'                           { $$ = $3; }
+            | '(' tIF expression instruction ')'             { $$ = new til::if_node(LINE, $3, $4); }
+            | '(' tIF expression instruction instruction ')' { $$ = new til::if_else_node(LINE, $3, $4, $5); }
+            | '(' tLOOP expression instruction ')'           { $$ = new til::loop_node(LINE, $3, $4); }
+            | '(' tSTOP ')'                                  { $$ = new til::stop_node(LINE); }
+            | '(' tSTOP tINTEGER ')'                         { $$ = new til::stop_node(LINE, $3); }
+            | '(' tNEXT ')'                                  { $$ = new til::next_node(LINE); }
+            | '(' tNEXT tINTEGER ')'                         { $$ = new til::next_node(LINE, $3); }
+            | '(' tRETURN ')'                                { $$ = new til::return_node(LINE); }
+            | '(' tRETURN expression ')'                     { $$ = new til::return_node(LINE, $3); }
+            | expression                                     { $$ = new til::evaluation_node(LINE, $1); }
+            | '(' tPRINT expressions ')'                     { $$ = new til::print_node(LINE, $3); }
+            | '(' tPRINTLN expressions ')'                   { $$ = new til::print_node(LINE, $3, true); }
+            /* | tIF '(' expression ')' stmt %prec tIFX { $$ = new til::if_node(LINE, $3, $5); } */
+            /* | tIF '(' expression ')' stmt tELSE stmt { $$ = new til::if_else_node(LINE, $3, $5, $7); } */
+            ;
 
 expression : tINTEGER                    { $$ = new cdk::integer_node(LINE, $1); }
+           | tDOUBLE                     { $$ = new cdk::double_node(LINE, $1); }
            | tSTRING                     { $$ = new cdk::string_node(LINE, $1); }
+           | tNULL                       { $$ = new til::nullptr_node(LINE); }
            /* UNARY EXPRESSION */
            | '-' expression %prec tUNARY { $$ = new cdk::unary_minus_node(LINE, $2); }
            | '+' expression %prec tUNARY { $$ = new cdk::unary_plus_node(LINE, $2); }
@@ -175,10 +178,12 @@ expression : tINTEGER                    { $$ = new cdk::integer_node(LINE, $1);
            /* logical expressions */
            | '(' tAND expression expression ')' { $$ = new cdk::and_node(LINE, $3, $4); }
            | '(' tOR expression expression ')'  { $$ = new cdk::or_node (LINE, $3, $4); }
-           | '(' expression ')'          { $$ = $2; }
            | lval                        { $$ = new cdk::rvalue_node(LINE, $1); }
-           | lval '=' expression         { $$ = new cdk::assignment_node(LINE, $1, $3); }
+           /* assignemnts */
+           | tSET lval expression        { $$ = new cdk::assignment_node(LINE, $2, $3); }
            | tREAD                       { $$ = new til::read_node(LINE); }
+           /* others */
+           | '(' tSIZEOF expression ')'  { $$ = new til::sizeof_node(LINE, $3); }
            ;
 
 expressions : expression             { $$ = new cdk::sequence_node(LINE, $1); }

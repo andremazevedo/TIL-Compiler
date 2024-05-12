@@ -107,7 +107,7 @@ double stringToDouble(const std::string &str) {
 0[0-9]+                                 std::cerr << "error: line " << lineno() << ": invalid literal" << std::endl; exit(1);
 
 "0x"                                    yy_push_state(X_HEX_INT);
-<X_HEX_INT>[0-9A-Fa-f]+                 yylval.i = stringToInteger(yytext, 16); yy_pop_state(); return tINTEGER;
+<X_HEX_INT>0*[1-9A-Fa-f][0-9A-Fa-f]*    yylval.i = stringToInteger(yytext, 16); yy_pop_state(); return tINTEGER;
 <X_HEX_INT>.|\n                         std::cerr << "error: line " << lineno() << ": invalid hexadecimal literal" << std::endl; exit(1);
 
   /* literals doubles */
