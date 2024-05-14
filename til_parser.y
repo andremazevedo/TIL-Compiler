@@ -51,11 +51,12 @@
 %nonassoc tIFX
 %nonassoc tELSE
 
-%right '='
-%left tGE tLE tEQ tNE '>' '<'
+%right tSET
+%left tGE tLE tEQ tNE '>' '<' tAND tOR
 %left '+' '-'
 %left '*' '/' '%'
 %nonassoc tUNARY
+%nonassoc '~'
 
 %type <basic> declaration argument_declaration program instruction
 %type <expression> expression function
@@ -136,11 +137,6 @@ void_type : tTYPE_VOID    { $$ = cdk::primitive_type::create(0, cdk::TYPE_VOID);
           | void_type '!' { $$ = cdk::reference_type::create(4, cdk::primitive_type::create(0, cdk::TYPE_VOID)); }
           ;
 
-
-
-
-
-
 block : /* empty */               { $$ = new til::block_node(LINE, nullptr, nullptr); }
       | declarations              { $$ = new til::block_node(LINE, $1, nullptr); }
       | instructions              { $$ = new til::block_node(LINE, nullptr, $1); }
@@ -160,8 +156,6 @@ instruction : '(' tBLOCK block ')'                           { $$ = $3; }
             | expression                                     { $$ = new til::evaluation_node(LINE, $1); }
             | '(' tPRINT expressions ')'                     { $$ = new til::print_node(LINE, $3); }
             | '(' tPRINTLN expressions ')'                   { $$ = new til::print_node(LINE, $3, true); }
-            /* TODO | tIF '(' expression ')' stmt %prec tIFX { $$ = new til::if_node(LINE, $3, $5); } */
-            /* TODO | tIF '(' expression ')' stmt tELSE stmt { $$ = new til::if_else_node(LINE, $3, $5, $7); } */
             ;
 
 instructions : instruction              { $$ = new cdk::sequence_node(LINE, $1); }
@@ -173,8 +167,8 @@ expression : tINTEGER                           { $$ = new cdk::integer_node(LIN
            | tSTRING                            { $$ = new cdk::string_node(LINE, $1); }
            | tNULL                              { $$ = new til::nullptr_node(LINE); }
            /* unary expressions */
-           | '-' expression %prec tUNARY        { $$ = new cdk::unary_minus_node(LINE, $2); }
-           | '+' expression %prec tUNARY        { $$ = new cdk::unary_plus_node(LINE, $2); }
+           | '(' '-' expression ')' %prec tUNARY { $$ = new cdk::unary_minus_node(LINE, $3); }
+           | '(' '+' expression ')' %prec tUNARY { $$ = new cdk::unary_plus_node(LINE, $3); }
            /* arithmetic expressions */
            | '(' '+' expression expression ')'  { $$ = new cdk::add_node(LINE, $3, $4); }
            | '(' '-' expression expression ')'  { $$ = new cdk::sub_node(LINE, $3, $4); }
