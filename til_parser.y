@@ -63,8 +63,8 @@
 %type <lvalue> lvalue
 
 %type <i> qualifier
-%type <type> data_type function_type
-%type <types> data_types
+%type <type> type data_type function_type void_type
+%type <types> types
 %type <block> block
 
 %{
@@ -79,14 +79,14 @@ file : /* empty */          { compiler->ast($$ = new cdk::sequence_node(LINE)); 
      | declarations program { compiler->ast($$ = new cdk::sequence_node(LINE, $2, $1)); }
      ;
 
-declaration : '(' data_type tIDENTIFIER ')'                      { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
-            | '(' qualifier data_type tIDENTIFIER ')'            { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, nullptr); }
-            | '(' data_type tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); }
-            | '(' qualifier data_type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, $5); }
+declaration : '(' type tIDENTIFIER ')'                      { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
+            | '(' qualifier type tIDENTIFIER ')'            { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, nullptr); }
+            | '(' type tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); }
+            | '(' qualifier type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, $5); }
             /* var */
-            | '(' qualifier tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$3, $4); }
-            | '(' tVAR tIDENTIFIER expression ')'                { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); }
-            | '(' qualifier tVAR tIDENTIFIER expression ')'      { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$4, $5); }
+            | '(' qualifier tIDENTIFIER expression ')'      { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$3, $4); }
+            | '(' tVAR tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); }
+            | '(' qualifier tVAR tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$4, $5); }
             ;
 
 declarations : declaration              { $$ = new cdk::sequence_node(LINE, $1); }
@@ -98,7 +98,7 @@ qualifier : tPUBLIC   { $$ = tPUBLIC; }
           | tEXTERNAL { $$ = tEXTERNAL; }
           ;
 
-argument_declaration : '(' data_type tIDENTIFIER ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
+argument_declaration : '(' type tIDENTIFIER ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
                      ;
 
 argument_declarations : argument_declaration                       { $$ = new cdk::sequence_node(LINE, $1); }
@@ -108,25 +108,33 @@ argument_declarations : argument_declaration                       { $$ = new cd
 program : '(' tPROGRAM block ')' { $$ = new til::program_node(LINE, nullptr, $3); }
         ;
 
-function : '(' tFUNCTION '(' data_type ')' block ')'                       { $$ = new til::function_definition_node(LINE, $4, nullptr, $6); }
-         | '(' tFUNCTION '(' data_type argument_declarations ')' block ')' { $$ = new til::function_definition_node(LINE, $4, $5, $7); }
+function : '(' tFUNCTION '(' type ')' block ')'                       { $$ = new til::function_definition_node(LINE, $4, nullptr, $6); }
+         | '(' tFUNCTION '(' type argument_declarations ')' block ')' { $$ = new til::function_definition_node(LINE, $4, $5, $7); }
          ;
 
-data_type : tTYPE_INT                        { $$ = cdk::primitive_type::create(4, cdk::TYPE_INT); }
-          | tTYPE_DOUBLE                     { $$ = cdk::primitive_type::create(8, cdk::TYPE_DOUBLE); }
-          | tTYPE_STRING                     { $$ = cdk::primitive_type::create(4, cdk::TYPE_STRING); }
-          | tTYPE_VOID                       { $$ = cdk::primitive_type::create(0, cdk::TYPE_VOID); }
-          | data_type '!'                    { $$ = cdk::reference_type::create(4, $1); }
-          | function_type                    { $$ = $1; }
+type : data_type     { $$ = $1; }
+     | function_type { $$ = $1; }
+     | void_type     { $$ = $1; }
+     ;
+
+types : type       { $$ = new std::vector<std::shared_ptr<cdk::basic_type>>(); $$->push_back($1); }
+      | types type { $$ = $1; $$->push_back($2); }
+      ;
+
+data_type : tTYPE_INT     { $$ = cdk::primitive_type::create(4, cdk::TYPE_INT); }
+          | tTYPE_DOUBLE  { $$ = cdk::primitive_type::create(8, cdk::TYPE_DOUBLE); }
+          | tTYPE_STRING  { $$ = cdk::primitive_type::create(4, cdk::TYPE_STRING); }
+          | data_type '!' { $$ = cdk::reference_type::create(4, $1); }
           ;
 
-function_type : '(' data_type ')'                    { $$ = cdk::functional_type::create($2); }
-              | '(' data_type '(' data_types ')' ')' { $$ = cdk::functional_type::create(*$4, $2); }
+function_type : '(' type ')'               { $$ = cdk::functional_type::create($2); }
+              | '(' type '(' types ')' ')' { $$ = cdk::functional_type::create(*$4, $2); }
+              | function_type '!'          { $$ = cdk::reference_type::create(4, $1); }
               ;
 
-data_types : data_type            { $$ = new std::vector<std::shared_ptr<cdk::basic_type>>(); $$->push_back($1); }
-           | data_types data_type { $$ = $1; $$->push_back($2); }
-           ;
+void_type : tTYPE_VOID    { $$ = cdk::primitive_type::create(0, cdk::TYPE_VOID); }
+          | void_type '!' { $$ = cdk::reference_type::create(4, cdk::primitive_type::create(0, cdk::TYPE_VOID)); }
+          ;
 
 
 

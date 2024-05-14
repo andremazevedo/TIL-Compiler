@@ -157,7 +157,7 @@ double stringToDouble(const std::string &str) {
 <X_NULL>\n                    yyerror("newline in string");
 
  /* others */
-@                     return *yytext;
+[!@]                  return *yytext;
 
   /* whitespaces */
 [\n\r \t]+            ;
