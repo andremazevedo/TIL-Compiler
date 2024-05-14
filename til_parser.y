@@ -60,7 +60,7 @@
 %type <basic> declaration argument_declaration program instruction
 %type <expression> expression function
 %type <sequence> file declarations expressions argument_declarations instructions
-%type <lvalue> lval
+%type <lvalue> lvalue
 
 %type <i> qualifier
 %type <type> data_type function_type
@@ -79,19 +79,19 @@ file : /* empty */          { compiler->ast($$ = new cdk::sequence_node(LINE)); 
      | declarations program { compiler->ast($$ = new cdk::sequence_node(LINE, $2, $1)); }
      ;
 
-declarations : declaration              { $$ = new cdk::sequence_node(LINE, $1); }
-             | declarations declaration { $$ = new cdk::sequence_node(LINE, $2, $1); }
-
 declaration : '(' data_type tIDENTIFIER ')'                      { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
             | '(' qualifier data_type tIDENTIFIER ')'            { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, nullptr); }
             | '(' data_type tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); }
             | '(' qualifier data_type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, $5); }
             /* var */
-            | '(' tIDENTIFIER expression ')'                     { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$2, $3); }
             | '(' qualifier tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$3, $4); }
             | '(' tVAR tIDENTIFIER expression ')'                { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); }
             | '(' qualifier tVAR tIDENTIFIER expression ')'      { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$4, $5); }
             ;
+
+declarations : declaration              { $$ = new cdk::sequence_node(LINE, $1); }
+             | declarations declaration { $$ = new cdk::sequence_node(LINE, $2, $1); }
+             ;
 
 qualifier : tPUBLIC   { $$ = tPUBLIC; }
           | tFORWARD  { $$ = tFORWARD; }
@@ -126,6 +126,7 @@ function_type : '(' data_type ')'                    { $$ = cdk::functional_type
 
 data_types : data_type            { $$ = new std::vector<std::shared_ptr<cdk::basic_type>>(); $$->push_back($1); }
            | data_types data_type { $$ = $1; $$->push_back($2); }
+           ;
 
 
 
@@ -137,10 +138,6 @@ block : /* empty */               { $$ = new til::block_node(LINE, nullptr, null
       | instructions              { $$ = new til::block_node(LINE, nullptr, $1); }
       | declarations instructions { $$ = new til::block_node(LINE, $1, $2); }
       ;
-
-instructions : instruction              { $$ = new cdk::sequence_node(LINE, $1); }
-             | instructions instruction { $$ = new cdk::sequence_node(LINE, $2, $1); }
-             ;
 
 instruction : '(' tBLOCK block ')'                           { $$ = $3; }
             | '(' tIF expression instruction ')'             { $$ = new til::if_node(LINE, $3, $4); }
@@ -155,17 +152,21 @@ instruction : '(' tBLOCK block ')'                           { $$ = $3; }
             | expression                                     { $$ = new til::evaluation_node(LINE, $1); }
             | '(' tPRINT expressions ')'                     { $$ = new til::print_node(LINE, $3); }
             | '(' tPRINTLN expressions ')'                   { $$ = new til::print_node(LINE, $3, true); }
-            /* | tIF '(' expression ')' stmt %prec tIFX { $$ = new til::if_node(LINE, $3, $5); } */
-            /* | tIF '(' expression ')' stmt tELSE stmt { $$ = new til::if_else_node(LINE, $3, $5, $7); } */
+            /* TODO | tIF '(' expression ')' stmt %prec tIFX { $$ = new til::if_node(LINE, $3, $5); } */
+            /* TODO | tIF '(' expression ')' stmt tELSE stmt { $$ = new til::if_else_node(LINE, $3, $5, $7); } */
             ;
 
-expression : tINTEGER                    { $$ = new cdk::integer_node(LINE, $1); }
-           | tDOUBLE                     { $$ = new cdk::double_node(LINE, $1); }
-           | tSTRING                     { $$ = new cdk::string_node(LINE, $1); }
-           | tNULL                       { $$ = new til::nullptr_node(LINE); }
-           /* UNARY EXPRESSION */
-           | '-' expression %prec tUNARY { $$ = new cdk::unary_minus_node(LINE, $2); }
-           | '+' expression %prec tUNARY { $$ = new cdk::unary_plus_node(LINE, $2); }
+instructions : instruction              { $$ = new cdk::sequence_node(LINE, $1); }
+             | instructions instruction { $$ = new cdk::sequence_node(LINE, $2, $1); }
+             ;
+
+expression : tINTEGER                           { $$ = new cdk::integer_node(LINE, $1); }
+           | tDOUBLE                            { $$ = new cdk::double_node(LINE, $1); }
+           | tSTRING                            { $$ = new cdk::string_node(LINE, $1); }
+           | tNULL                              { $$ = new til::nullptr_node(LINE); }
+           /* unary expressions */
+           | '-' expression %prec tUNARY        { $$ = new cdk::unary_minus_node(LINE, $2); }
+           | '+' expression %prec tUNARY        { $$ = new cdk::unary_plus_node(LINE, $2); }
            /* arithmetic expressions */
            | '(' '+' expression expression ')'  { $$ = new cdk::add_node(LINE, $3, $4); }
            | '(' '-' expression expression ')'  { $$ = new cdk::sub_node(LINE, $3, $4); }
@@ -183,25 +184,29 @@ expression : tINTEGER                    { $$ = new cdk::integer_node(LINE, $1);
            | '(' tAND expression expression ')' { $$ = new cdk::and_node(LINE, $3, $4); }
            | '(' tOR expression expression ')'  { $$ = new cdk::or_node (LINE, $3, $4); }
            /* assignemnts */
-           | tSET lval expression        { $$ = new cdk::assignment_node(LINE, $2, $3); }
+           | tSET lvalue expression             { $$ = new cdk::assignment_node(LINE, $2, $3); }
            /* identifiers */
-           | lval                        { $$ = new cdk::rvalue_node(LINE, $1); }
-           | tREAD                       { $$ = new til::read_node(LINE); }
+           | lvalue                             { $$ = new cdk::rvalue_node(LINE, $1); }
+           /* read */
+           | '(' tREAD ')'                      { $$ = new til::read_node(LINE); }
            /* functions */
-           | function                       { $$ = $1; }
-           | '(' expression ')'             { $$ = new til::function_call_node(LINE, $2, nullptr); }
-           | '(' expression expressions ')' { $$ = new til::function_call_node(LINE, $2, $3); }
-           | '(' '@' ')'                      { $$ = new til::function_call_node(LINE, nullptr, nullptr); }
-           | '(' '@' expressions ')'          { $$ = new til::function_call_node(LINE, nullptr, $3); }
+           | function                           { $$ = $1; }
+           | '(' expression ')'                 { $$ = new til::function_call_node(LINE, $2, nullptr); }
+           | '(' expression expressions ')'     { $$ = new til::function_call_node(LINE, $2, $3); }
+           | '(' '@' ')'                        { $$ = new til::function_call_node(LINE, nullptr, nullptr); }
+           | '(' '@' expressions ')'            { $$ = new til::function_call_node(LINE, nullptr, $3); }
            /* others */
-           | '(' tSIZEOF expression ')'  { $$ = new til::sizeof_node(LINE, $3); }
+           | '(' tOBJECTS expression ')'        { $$ = new til::stack_alloc_node(LINE, $3); }
+           | '(' '?' lvalue ')'                 { $$ = new til::address_of_node(LINE, $3); }
+           | '(' tSIZEOF expression ')'         { $$ = new til::sizeof_node(LINE, $3); }
            ;
 
 expressions : expression             { $$ = new cdk::sequence_node(LINE, $1); }
             | expressions expression { $$ = new cdk::sequence_node(LINE, $2, $1); }
             ;
 
-lval : tIDENTIFIER             { $$ = new cdk::variable_node(LINE, $1); }
-     ;
+lvalue : tIDENTIFIER                          { $$ = new cdk::variable_node(LINE, $1); }
+       | '(' tINDEX expression expression ')' { $$ = new til::index_node(LINE, $3, $4); }
+       ;
 
 %%

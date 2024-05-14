@@ -299,19 +299,35 @@ void til::xml_writer::do_variable_declaration_node(til::variable_declaration_nod
 //---------------------------------------------------------------------------
 
 void til::xml_writer::do_nullptr_node(til::nullptr_node * const node, int lvl) {
-  // TODO
+  // ASSERT_SAFE_EXPRESSIONS;
+  openTag(node, lvl);
+  closeTag(node, lvl);
 }
 
 void til::xml_writer::do_index_node(til::index_node * const node, int lvl) {
-  // TODO
+  // ASSERT_SAFE_EXPRESSIONS;
+  openTag(node, lvl);
+  openTag("base", lvl + 2);
+  node->base()->accept(this, lvl + 4);
+  closeTag("base", lvl + 2);
+  openTag("index", lvl + 2);
+  node->index()->accept(this, lvl + 4);
+  closeTag("index", lvl + 2);
+  closeTag(node, lvl);
 }
 
 void til::xml_writer::do_stack_alloc_node(til::stack_alloc_node * const node, int lvl) {
-  // TODO
+  // ASSERT_SAFE_EXPRESSIONS;
+  openTag(node, lvl);
+  node->argument()->accept(this, lvl + 2);
+  closeTag(node, lvl);
 }
 
 void til::xml_writer::do_address_of_node(til::address_of_node * const node, int lvl) {
-  // TODO
+  // ASSERT_SAFE_EXPRESSIONS;
+  openTag(node, lvl);
+  node->lvalue()->accept(this, lvl + 2);
+  closeTag(node, lvl);
 }
 
 //---------------------------------------------------------------------------
