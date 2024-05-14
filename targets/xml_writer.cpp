@@ -26,12 +26,6 @@ void til::xml_writer::do_nil_node(cdk::nil_node * const node, int lvl) {
 void til::xml_writer::do_data_node(cdk::data_node * const node, int lvl) {
   // EMPTY
 }
-void til::xml_writer::do_double_node(cdk::double_node * const node, int lvl) {
-  // EMPTY
-}
-void til::xml_writer::do_not_node(cdk::not_node * const node, int lvl) {
-  // EMPTY
-}
 
 //---------------------------------------------------------------------------
 
@@ -45,6 +39,10 @@ void til::xml_writer::do_sequence_node(cdk::sequence_node * const node, int lvl)
 //---------------------------------------------------------------------------
 
 void til::xml_writer::do_integer_node(cdk::integer_node * const node, int lvl) {
+  process_literal(node, lvl);
+}
+
+void til::xml_writer::do_double_node(cdk::double_node * const node, int lvl) {
   process_literal(node, lvl);
 }
 
@@ -66,6 +64,10 @@ void til::xml_writer::do_unary_minus_node(cdk::unary_minus_node * const node, in
 }
 
 void til::xml_writer::do_unary_plus_node(cdk::unary_plus_node * const node, int lvl) {
+  do_unary_operation(node, lvl);
+}
+
+void til::xml_writer::do_not_node(cdk::not_node * const node, int lvl) {
   do_unary_operation(node, lvl);
 }
 
@@ -165,7 +167,6 @@ void til::xml_writer::do_block_node(til::block_node * const node, int lvl) {
 void til::xml_writer::do_program_node(til::program_node * const node, int lvl) {
   // ASSERT_SAFE_EXPRESSIONS;
   openTag(node, lvl);
-  // node->statements()->accept(this, lvl + 4);
   node->block()->accept(this, lvl + 2);
   closeTag(node, lvl);
 }
@@ -190,9 +191,8 @@ void til::xml_writer::do_print_node(til::print_node * const node, int lvl) {
 
 void til::xml_writer::do_read_node(til::read_node * const node, int lvl) {
   // ASSERT_SAFE_EXPRESSIONS;
-  // openTag(node, lvl);
-  // node->argument()->accept(this, lvl + 2);
-  // closeTag(node, lvl);
+  openTag(node, lvl);
+  closeTag(node, lvl);
 }
 
 //---------------------------------------------------------------------------
@@ -262,6 +262,7 @@ void til::xml_writer::do_function_definition_node(til::function_definition_node 
 }
 
 void til::xml_writer::do_function_call_node(til::function_call_node * const node, int lvl) {
+  // ASSERT_SAFE_EXPRESSIONS;
   openTag(node, lvl);
   node->expression()->accept(this, lvl + 2);
   openTag("arguments", lvl + 2);

@@ -42,7 +42,7 @@
 %token tBLOCK tIF tLOOP tSTOP tNEXT tRETURN tPRINT tPRINTLN
 %token tREAD tNULL tSET tINDEX tOBJECTS tSIZEOF tFUNCTION
 %token tPROGRAM
-%token tLE tGE tEQ tNE tAND tOR 
+%token tLE tGE tEQ tNE tAND tOR
 
 %token <i> tINTEGER
 %token <d> tDOUBLE
@@ -180,7 +180,7 @@ expression : tINTEGER                           { $$ = new cdk::integer_node(LIN
            | '(' tGE expression expression ')'  { $$ = new cdk::ge_node(LINE, $3, $4); }
            | '(' tEQ expression expression ')'  { $$ = new cdk::eq_node(LINE, $3, $4); }
            | '(' tNE expression expression ')'  { $$ = new cdk::ne_node(LINE, $3, $4); }
-           /* logical expressions */
+           | '(' '~' expression ')'             { $$ = new cdk::not_node(LINE, $3); }
            | '(' tAND expression expression ')' { $$ = new cdk::and_node(LINE, $3, $4); }
            | '(' tOR expression expression ')'  { $$ = new cdk::or_node (LINE, $3, $4); }
            /* assignemnts */

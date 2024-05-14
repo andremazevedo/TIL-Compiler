@@ -21,7 +21,7 @@ int stringToInteger(const std::string &str, int base) {
     return std::stoi(str, nullptr, base);
   }
   catch (const std::out_of_range& e) {
-    // TODO std::cerr << "error: line " << lineno() << ": integer literal overflow" << std::endl; 
+    std::cerr << "error: integer literal overflow" << std::endl; 
     exit(1);
   }
 }
@@ -31,7 +31,7 @@ double stringToDouble(const std::string &str) {
     return std::stod(str);
   }
   catch (const std::out_of_range& e) {
-    // TODO std::cerr << "error: line " << lineno() << ": double literal overflow" << std::endl; 
+    std::cerr << "error: double literal overflow" << std::endl; 
     exit(1);
   }
 }
