@@ -48,16 +48,6 @@
 %token <d> tDOUBLE
 %token <s> tIDENTIFIER tSTRING
 
-%nonassoc tIFX
-%nonassoc tELSE
-
-%right tSET
-%left tGE tLE tEQ tNE '>' '<' tAND tOR
-%left '+' '-'
-%left '*' '/' '%'
-%nonassoc tUNARY
-%nonassoc '~'
-
 %type <basic> declaration argument_declaration program instruction
 %type <expression> expression function
 %type <sequence> file declarations expressions argument_declarations instructions
@@ -106,7 +96,7 @@ argument_declarations : argument_declaration                       { $$ = new cd
                       | argument_declarations argument_declaration { $$ = new cdk::sequence_node(LINE, $2, $1); }
                       ;
 
-program : '(' tPROGRAM block ')' { $$ = new til::program_node(LINE, nullptr, $3); }
+program : '(' tPROGRAM block ')' { $$ = new til::program_node(LINE, $3); }
         ;
 
 function : '(' tFUNCTION '(' type ')' block ')'                       { $$ = new til::function_definition_node(LINE, $4, nullptr, $6); }
@@ -167,8 +157,8 @@ expression : tINTEGER                           { $$ = new cdk::integer_node(LIN
            | tSTRING                            { $$ = new cdk::string_node(LINE, $1); }
            | tNULL                              { $$ = new til::nullptr_node(LINE); }
            /* unary expressions */
-           | '(' '-' expression ')' %prec tUNARY { $$ = new cdk::unary_minus_node(LINE, $3); }
-           | '(' '+' expression ')' %prec tUNARY { $$ = new cdk::unary_plus_node(LINE, $3); }
+           | '(' '-' expression ')'             { $$ = new cdk::unary_minus_node(LINE, $3); }
+           | '(' '+' expression ')'             { $$ = new cdk::unary_plus_node(LINE, $3); }
            /* arithmetic expressions */
            | '(' '+' expression expression ')'  { $$ = new cdk::add_node(LINE, $3, $4); }
            | '(' '-' expression expression ')'  { $$ = new cdk::sub_node(LINE, $3, $4); }
@@ -186,7 +176,7 @@ expression : tINTEGER                           { $$ = new cdk::integer_node(LIN
            | '(' tAND expression expression ')' { $$ = new cdk::and_node(LINE, $3, $4); }
            | '(' tOR expression expression ')'  { $$ = new cdk::or_node (LINE, $3, $4); }
            /* assignemnts */
-           | tSET lvalue expression             { $$ = new cdk::assignment_node(LINE, $2, $3); }
+           | '(' tSET lvalue expression ')'     { $$ = new cdk::assignment_node(LINE, $3, $4); }
            /* identifiers */
            | lvalue                             { $$ = new cdk::rvalue_node(LINE, $1); }
            /* read */

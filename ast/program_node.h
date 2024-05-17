@@ -13,9 +13,9 @@ namespace til {
     til::block_node *_block;
 
   public:
-    program_node(int lineno, std::shared_ptr<cdk::basic_type> proType, til::block_node *block) :
+    program_node(int lineno, til::block_node *block) :
         cdk::expression_node(lineno), _block(block) {
-      type(proType);
+      type(cdk::functional_type::create(cdk::primitive_type::create(4, cdk::TYPE_INT)));
     }
 
     til::block_node *block() { return _block; }
