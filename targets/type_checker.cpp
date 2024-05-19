@@ -19,9 +19,6 @@ void til::type_checker::do_nil_node(cdk::nil_node *const node, int lvl) {
 void til::type_checker::do_data_node(cdk::data_node *const node, int lvl) {
   // EMPTY
 }
-void til::type_checker::do_double_node(cdk::double_node *const node, int lvl) {
-  // EMPTY
-}
 void til::type_checker::do_not_node(cdk::not_node *const node, int lvl) {
   // EMPTY
 }
@@ -37,6 +34,11 @@ void til::type_checker::do_or_node(cdk::or_node *const node, int lvl) {
 void til::type_checker::do_integer_node(cdk::integer_node *const node, int lvl) {
   ASSERT_UNSPEC;
   node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+}
+
+void til::type_checker::do_double_node(cdk::double_node *const node, int lvl) {
+  ASSERT_UNSPEC;
+  node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
 }
 
 void til::type_checker::do_string_node(cdk::string_node *const node, int lvl) {
@@ -120,7 +122,7 @@ void til::type_checker::do_variable_node(cdk::variable_node *const node, int lvl
   if (symbol != nullptr) {
     node->type(symbol->type());
   } else {
-    throw id;
+    throw id + " undeclared";
   }
 }
 
@@ -158,7 +160,7 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node, int
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
-  // TODO
+  // EMPTY
 }
 
 //---------------------------------------------------------------------------
@@ -172,7 +174,7 @@ void til::type_checker::do_evaluation_node(til::evaluation_node *const node, int
 }
 
 void til::type_checker::do_print_node(til::print_node *const node, int lvl) {
-  // node->argument()->accept(this, lvl + 2);
+  // EMPTY
 }
 
 //---------------------------------------------------------------------------
