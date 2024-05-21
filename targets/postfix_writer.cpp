@@ -12,15 +12,6 @@ void til::postfix_writer::do_nil_node(cdk::nil_node * const node, int lvl) {
 void til::postfix_writer::do_data_node(cdk::data_node * const node, int lvl) {
   // EMPTY
 }
-void til::postfix_writer::do_not_node(cdk::not_node * const node, int lvl) {
-  // EMPTY
-}
-void til::postfix_writer::do_and_node(cdk::and_node * const node, int lvl) {
-  // EMPTY
-}
-void til::postfix_writer::do_or_node(cdk::or_node * const node, int lvl) {
-  // EMPTY
-}
 
 //---------------------------------------------------------------------------
 
@@ -68,6 +59,13 @@ void til::postfix_writer::do_unary_minus_node(cdk::unary_minus_node * const node
 void til::postfix_writer::do_unary_plus_node(cdk::unary_plus_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   node->argument()->accept(this, lvl); // determine the value
+}
+
+void til::postfix_writer::do_not_node(cdk::not_node * const node, int lvl) {
+  ASSERT_SAFE_EXPRESSIONS;
+  node->argument()->accept(this, lvl); // determine the value
+  _pf.INT(0);
+  _pf.EQ();
 }
 
 //---------------------------------------------------------------------------
@@ -141,6 +139,39 @@ void til::postfix_writer::do_eq_node(cdk::eq_node * const node, int lvl) {
 
 //---------------------------------------------------------------------------
 
+void til::postfix_writer::do_and_node(cdk::and_node * const node, int lvl) {
+  ASSERT_SAFE_EXPRESSIONS;
+  int lbl;
+  node->left()->accept(this, lvl + 2);
+  _pf.INT(0);
+  _pf.GT();
+  _pf.DUP32();
+  _pf.JZ(mklbl(lbl = ++_lbl));
+  node->right()->accept(this, lvl + 2);
+  _pf.INT(0);
+  _pf.GT();
+  _pf.AND();
+  _pf.ALIGN();
+  _pf.LABEL(mklbl(lbl));
+}
+void til::postfix_writer::do_or_node(cdk::or_node * const node, int lvl) {
+  ASSERT_SAFE_EXPRESSIONS;
+  int lbl;
+  node->left()->accept(this, lvl + 2);
+  _pf.INT(0);
+  _pf.GT();
+  _pf.DUP32();
+  _pf.JNZ(mklbl(lbl = ++_lbl));
+  node->right()->accept(this, lvl + 2);
+  _pf.INT(0);
+  _pf.GT();
+  _pf.OR();
+  _pf.ALIGN();
+  _pf.LABEL(mklbl(lbl));
+}
+
+//---------------------------------------------------------------------------
+
 void til::postfix_writer::do_variable_node(cdk::variable_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   // simplified generation: all variables are global
@@ -175,13 +206,10 @@ void til::postfix_writer::do_assignment_node(cdk::assignment_node * const node, 
 
 void til::postfix_writer::do_block_node(til::block_node * const node, int lvl) {
   _symtab.push(); // for block-local vars
-
   if (node->declarations())
     node->declarations()->accept(this, lvl + 2);
-
   if (node->instructions())
     node->instructions()->accept(this, lvl + 2);
-
   _symtab.pop();
 }
 

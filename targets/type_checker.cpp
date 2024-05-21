@@ -19,15 +19,6 @@ void til::type_checker::do_nil_node(cdk::nil_node *const node, int lvl) {
 void til::type_checker::do_data_node(cdk::data_node *const node, int lvl) {
   // EMPTY
 }
-void til::type_checker::do_not_node(cdk::not_node *const node, int lvl) {
-  // EMPTY
-}
-void til::type_checker::do_and_node(cdk::and_node *const node, int lvl) {
-  // EMPTY
-}
-void til::type_checker::do_or_node(cdk::or_node *const node, int lvl) {
-  // EMPTY
-}
 
 //---------------------------------------------------------------------------
 
@@ -62,6 +53,17 @@ void til::type_checker::do_unary_minus_node(cdk::unary_minus_node *const node, i
 
 void til::type_checker::do_unary_plus_node(cdk::unary_plus_node *const node, int lvl) {
   processUnaryExpression(node, lvl);
+}
+
+void til::type_checker::do_not_node(cdk::not_node *const node, int lvl) {
+  ASSERT_UNSPEC;
+  node->argument()->accept(this, lvl + 2);
+  if (node->argument()->is_typed(cdk::TYPE_INT)) {
+    node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+  }
+  else {
+    throw std::string("wrong type in unary logical expression");
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -110,6 +112,29 @@ void til::type_checker::do_ne_node(cdk::ne_node *const node, int lvl) {
 }
 void til::type_checker::do_eq_node(cdk::eq_node *const node, int lvl) {
   processBinaryExpression(node, lvl);
+}
+
+//---------------------------------------------------------------------------
+
+//protected:
+void til::type_checker::do_BooleanLogicalExpression(cdk::binary_operation_node *const node, int lvl) {
+  ASSERT_UNSPEC;
+  node->left()->accept(this, lvl + 2);
+  if (!node->left()->is_typed(cdk::TYPE_INT))
+    throw std::string("integer expression expected in binary expression");
+
+  node->right()->accept(this, lvl + 2);
+  if (!node->right()->is_typed(cdk::TYPE_INT))
+    throw std::string("integer expression expected in binary expression");
+
+  node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+}
+
+void til::type_checker::do_and_node(cdk::and_node *const node, int lvl) {
+  do_BooleanLogicalExpression(node, lvl);
+}
+void til::type_checker::do_or_node(cdk::or_node *const node, int lvl) {
+  do_BooleanLogicalExpression(node, lvl);
 }
 
 //---------------------------------------------------------------------------

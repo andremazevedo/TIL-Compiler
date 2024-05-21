@@ -29,6 +29,9 @@ namespace til {
     template<typename T>
     void process_literal(cdk::literal_node<T> *const node, int lvl) {
     }
+  
+  protected:
+    void do_BooleanLogicalExpression(cdk::binary_operation_node * const node, int lvl);
 
   public:
     // do not edit these lines
