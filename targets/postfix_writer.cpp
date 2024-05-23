@@ -4,6 +4,8 @@
 #include "targets/postfix_writer.h"
 #include ".auto/all_nodes.h"  // all_nodes.h is automatically generated
 
+#include "til_parser.tab.h"
+
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_nil_node(cdk::nil_node * const node, int lvl) {
@@ -25,12 +27,18 @@ void til::postfix_writer::do_sequence_node(cdk::sequence_node * const node, int 
 
 void til::postfix_writer::do_integer_node(cdk::integer_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  _pf.INT(node->value()); // push an integer
+  if (_inFunctionBody)
+    _pf.INT(node->value()); // integer literal is on the stack: push an integer
+  else
+    _pf.SINT(node->value()); // integer literal is on the DATA segment
 }
 
 void til::postfix_writer::do_double_node(cdk::double_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  _pf.DOUBLE(node->value()); // push a double
+  if (_inFunctionBody)
+    _pf.DOUBLE(node->value()); // load number to the stack
+  else
+    _pf.SDOUBLE(node->value()); // double is on the DATA segment
 }
 
 void til::postfix_writer::do_string_node(cdk::string_node * const node, int lvl) {
@@ -43,9 +51,15 @@ void til::postfix_writer::do_string_node(cdk::string_node * const node, int lvl)
   _pf.LABEL(mklbl(lbl1 = ++_lbl)); // give the string a name
   _pf.SSTRING(node->value()); // output string characters
 
-  /* leave the address on the stack */
-  _pf.TEXT(); // return to the TEXT segment
-  _pf.ADDR(mklbl(lbl1)); // the string to be printed
+  // TODO
+  
+  // /* leave the address on the stack */
+  // _pf.TEXT(); // return to the TEXT segment
+  // _pf.ADDR(mklbl(lbl1)); // the string to be printed
+
+  // global variable initializer
+  _pf.DATA();
+  _pf.SADDR(mklbl(lbl1));
 }
 
 //---------------------------------------------------------------------------
@@ -174,32 +188,65 @@ void til::postfix_writer::do_or_node(cdk::or_node * const node, int lvl) {
 
 void til::postfix_writer::do_variable_node(cdk::variable_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  // simplified generation: all variables are global
-  _pf.ADDR(node->name());
+  const std::string &id = node->name();
+  auto symbol = _symtab.find(id);
+  if (symbol->global()) {
+    _pf.ADDR(symbol->name());
+    // _pf.ADDR(node->name());
+  } 
+  else {
+    _pf.LOCAL(symbol->offset());
+  }
 }
 
 void til::postfix_writer::do_rvalue_node(cdk::rvalue_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   node->lvalue()->accept(this, lvl);
-  _pf.LDINT(); // depends on type size
+  if (node->is_typed(cdk::TYPE_INT)) {
+    _pf.LDINT();
+  }
+  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+    _pf.LDDOUBLE();
+  } 
+  else if (node->is_typed(cdk::TYPE_STRING)){
+    _pf.LDINT();
+  }
+  else {
+    std::cerr << "error: cannot happen" << std::endl;
+  }
 }
 
 void til::postfix_writer::do_assignment_node(cdk::assignment_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->rvalue()->accept(this, lvl); // determine the new value
-  _pf.DUP32();
-  if (new_symbol() == nullptr) {
-    node->lvalue()->accept(this, lvl); // where to store the value
-  } else {
-    _pf.DATA(); // variables are all global and live in DATA
-    _pf.ALIGN(); // make sure we are aligned
-    _pf.LABEL(new_symbol()->name()); // name variable location
-    reset_new_symbol();
-    _pf.SINT(0); // initialize it to 0 (zero)
-    _pf.TEXT(); // return to the TEXT segment
-    node->lvalue()->accept(this, lvl);  //DAVID: bah!
+  node->rvalue()->accept(this, lvl + 2); // determine the new value
+  if (node->is_typed(cdk::TYPE_INT)) {
+    _pf.DUP32();
   }
-  _pf.STINT(); // store the value at address
+  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+    if (node->rvalue()->is_typed(cdk::TYPE_INT))
+      _pf.I2D();
+    _pf.DUP64();
+  }
+  else if (node->is_typed(cdk::TYPE_STRING)){
+    _pf.DUP32();
+  }
+  else {
+    std::cerr << "error: cannot happen" << std::endl;
+  }
+
+  node->lvalue()->accept(this, lvl); // where to store the value
+  if (node->is_typed(cdk::TYPE_INT)) {
+    _pf.STINT();
+  }
+  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+    _pf.STDOUBLE();
+  }
+  else if (node->is_typed(cdk::TYPE_STRING)) {
+    _pf.STINT();
+  }
+  else {
+    std::cerr << "error: cannot happen" << std::endl;
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -228,7 +275,9 @@ void til::postfix_writer::do_program_node(til::program_node * const node, int lv
   _pf.LABEL("_main");
   _pf.ENTER(0);  // Simple doesn't implement local variables
 
+  _inFunctionBody = true;
   node->block()->accept(this, lvl);
+  _inFunctionBody = false;
 
   // end the main function
   _pf.INT(0);
@@ -345,8 +394,6 @@ void til::postfix_writer::do_if_node(til::if_node * const node, int lvl) {
   _pf.LABEL(mklbl(lbl1));
 }
 
-//---------------------------------------------------------------------------
-
 void til::postfix_writer::do_if_else_node(til::if_else_node * const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   int lbl1, lbl2;
@@ -378,7 +425,64 @@ void til::postfix_writer::do_return_node(til::return_node * const node, int lvl)
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_variable_declaration_node(til::variable_declaration_node * const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+
+  const std::string &id = node->identifier();
+
+  int offset = 0;
+
+  auto symbol = new_symbol();
+  if (symbol) {
+    symbol->offset(offset);
+    reset_new_symbol();
+  }
+
+  if (_inFunctionBody) {
+    // TODO
+  }
+  else {
+    if (node->qualifier() == tEXTERNAL) {
+      _pf.EXTERN(id);
+    }
+    else if (node->qualifier() == tFORWARD) {
+      // TODO
+    }
+    else {
+      if (node->initializer()) {
+        if (node->is_typed(cdk::TYPE_INT)) {
+          _pf.DATA();
+          _pf.ALIGN();
+          if (node->qualifier() == tPUBLIC)
+            _pf.GLOBAL(id, _pf.OBJ());
+          _pf.LABEL(id);
+          node->initializer()->accept(this, lvl);
+        }
+        else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+          // TODO
+        }
+        else if (node->is_typed(cdk::TYPE_STRING)) {
+          _pf.DATA();
+          _pf.ALIGN();
+          if (node->qualifier() == tPUBLIC)
+            _pf.GLOBAL(id, _pf.OBJ());
+          _pf.LABEL(id);
+          node->initializer()->accept(this, lvl);
+        }
+        else {
+          std::cerr << node->lineno() << ": '" << id << "' has unexpected initializer\n";
+        }
+      }
+      else {
+        _pf.BSS();
+        _pf.ALIGN();
+        if (node->qualifier() == tPUBLIC)
+          _pf.GLOBAL(id, _pf.OBJ());
+        _pf.LABEL(id);
+        _pf.SALLOC(node->type()->size());
+      }
+    
+    }
+  }
 }
 
 //---------------------------------------------------------------------------

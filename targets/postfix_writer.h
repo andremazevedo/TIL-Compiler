@@ -3,6 +3,7 @@
 
 #include "targets/basic_ast_visitor.h"
 
+#include <set>
 #include <sstream>
 #include <cdk/emitters/basic_postfix_emitter.h>
 
@@ -13,13 +14,20 @@ namespace til {
   //!
   class postfix_writer: public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
+
+    // semantic analysis
+    std::set<std::string> _functions_to_declare;
+
+    bool _errors, _inFunctionArgs, _inFunctionBody;
+
     cdk::basic_postfix_emitter &_pf;
     int _lbl;
 
   public:
     postfix_writer(std::shared_ptr<cdk::compiler> compiler, cdk::symbol_table<til::symbol> &symtab,
                    cdk::basic_postfix_emitter &pf) :
-        basic_ast_visitor(compiler), _symtab(symtab), _pf(pf), _lbl(0) {
+        basic_ast_visitor(compiler), _symtab(symtab), _errors(false), _inFunctionArgs(false), _inFunctionBody(false), 
+        _pf(pf), _lbl(0) {
     }
 
   public:
