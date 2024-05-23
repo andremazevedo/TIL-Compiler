@@ -8,13 +8,17 @@
 namespace til {
 
   class symbol {
-    std::shared_ptr<cdk::basic_type> _type;
     std::string _name;
+    std::shared_ptr<cdk::basic_type> _type;
+    std::vector<std::shared_ptr<cdk::basic_type>> _argument_types;
+    bool _function; // function?
     long _value; // hack!
+    
+    int _offset = 0; // 0 (zero) means global variable/function
 
   public:
-    symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, long value) :
-        _type(type), _name(name), _value(value) {
+    symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, bool function) :
+        _name(name), _type(type), _function(function) {
     }
 
     virtual ~symbol() {
@@ -36,7 +40,20 @@ namespace til {
     long value(long v) {
       return _value = v;
     }
+    int offset() const {
+      return _offset;
+    }
+    int offset(int o) {
+      return _offset = o;
+    }
+    bool global() const {
+      return _offset == 0;
+    }
   };
+
+  inline auto make_symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, bool function) {
+    return std::make_shared<symbol>(type, name, function);
+  }
 
 } // til
 

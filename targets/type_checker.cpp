@@ -142,44 +142,36 @@ void til::type_checker::do_or_node(cdk::or_node *const node, int lvl) {
 void til::type_checker::do_variable_node(cdk::variable_node *const node, int lvl) {
   ASSERT_UNSPEC;
   const std::string &id = node->name();
-  std::shared_ptr<til::symbol> symbol = _symtab.find(id);
-
-  if (symbol != nullptr) {
-    node->type(symbol->type());
-  } else {
-    throw id + " undeclared";
-  }
+  auto symbol = _symtab.find(id);
+  if (!symbol)
+    throw std::string("undeclared variable '" + id + "'");
+  node->type(symbol->type());
 }
 
 void til::type_checker::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
   ASSERT_UNSPEC;
-  try {
-    node->lvalue()->accept(this, lvl);
-    node->type(node->lvalue()->type());
-  } catch (const std::string &id) {
-    throw "undeclared variable '" + id + "'";
-  }
+  node->lvalue()->accept(this, lvl);
+  node->type(node->lvalue()->type());
 }
 
 void til::type_checker::do_assignment_node(cdk::assignment_node *const node, int lvl) {
   ASSERT_UNSPEC;
+  node->lvalue()->accept(this, lvl + 4);
+  node->rvalue()->accept(this, lvl + 4);
 
-  try {
-    node->lvalue()->accept(this, lvl);
-  } catch (const std::string &id) {
-    auto symbol = std::make_shared<til::symbol>(cdk::primitive_type::create(4, cdk::TYPE_INT), id, 0);
-    _symtab.insert(id, symbol);
-    _parent->set_new_symbol(symbol);  // advise parent that a symbol has been inserted
-    node->lvalue()->accept(this, lvl);  //DAVID: bah!
+  if (node->lvalue()->is_typed(cdk::TYPE_INT)) {
+    if (!node->rvalue()->is_typed(cdk::TYPE_INT))
+      throw std::string("wrong assignment to integer");
+    node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
   }
-
-  if (!node->lvalue()->is_typed(cdk::TYPE_INT)) throw std::string("wrong type in left argument of assignment expression");
-
-  node->rvalue()->accept(this, lvl + 2);
-  if (!node->rvalue()->is_typed(cdk::TYPE_INT)) throw std::string("wrong type in right argument of assignment expression");
-
-  // in Simple, expressions are always int
-  node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+  else if (node->lvalue()->is_typed(cdk::TYPE_DOUBLE)) {
+    if (!(node->rvalue()->is_typed(cdk::TYPE_INT) || node->rvalue()->is_typed(cdk::TYPE_DOUBLE)))
+      throw std::string("wrong assignment to real");
+    node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+  }
+  else {
+    throw std::string("wrong types in assignment");
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -230,10 +222,14 @@ void til::type_checker::do_next_node(til::next_node *const node, int lvl) {
 
 void til::type_checker::do_if_node(til::if_node *const node, int lvl) {
   node->condition()->accept(this, lvl + 4);
+  if (!node->condition()->is_typed(cdk::TYPE_INT))
+    throw std::string("expected integer condition");
 }
 
 void til::type_checker::do_if_else_node(til::if_else_node *const node, int lvl) {
   node->condition()->accept(this, lvl + 4);
+  if (!node->condition()->is_typed(cdk::TYPE_INT))
+    throw std::string("expected integer condition");
 }
 
 //---------------------------------------------------------------------------
@@ -255,7 +251,32 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
-  // TODO
+  const std::string &id = node->identifier();
+  auto symbol = til::make_symbol(node->type(), id, false);
+  if (!_symtab.insert(id, symbol))
+    throw std::string("variable '" + id + "' redeclared");
+
+  if (node->initializer()) {
+    node->initializer()->accept(this, lvl + 2);
+
+    if (node->is_typed(cdk::TYPE_INT)) {
+      if (!node->initializer()->is_typed(cdk::TYPE_INT))
+        throw std::string("wrong type for initializer (integer expected).");
+    }
+    else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+      if (!(node->initializer()->is_typed(cdk::TYPE_INT) || node->initializer()->is_typed(cdk::TYPE_DOUBLE)))
+        throw std::string("wrong type for initializer (integer or double expected).");
+    }
+    else if (node->is_typed(cdk::TYPE_STRING)) {
+      if (!node->initializer()->is_typed(cdk::TYPE_STRING))
+        throw std::string("wrong type for initializer (string expected).");
+    }
+    else {
+      throw std::string("unknown type for initializer.");
+    }
+  }
+
+  _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
 }
 
 //---------------------------------------------------------------------------
