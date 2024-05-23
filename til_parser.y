@@ -33,7 +33,6 @@
   cdk::lvalue_node     *lvalue;
 
   til::block_node      *block;
-
   std::vector<std::shared_ptr<cdk::basic_type>> *types;
 };
 
@@ -53,10 +52,9 @@
 %type <sequence> file declarations expressions argument_declarations instructions
 %type <lvalue> lvalue
 
-%type <i> qualifier
+%type <block> block
 %type <type> type data_type function_type void_type
 %type <types> types
-%type <block> block
 
 %{
 //-- The rules below will be included in yyparse, the main parsing function.
@@ -70,26 +68,23 @@ file : /* empty */          { compiler->ast($$ = new cdk::sequence_node(LINE)); 
      | declarations program { compiler->ast($$ = new cdk::sequence_node(LINE, $2, $1)); }
      ;
 
-declaration : '(' type tIDENTIFIER ')'                      { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
-            | '(' qualifier type tIDENTIFIER ')'            { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, nullptr); }
-            | '(' type tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); }
-            | '(' qualifier type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, $2, $3, *$4, $5); }
+declaration : '(' type tIDENTIFIER ')'                    { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); delete $3; }
+            | '(' type tIDENTIFIER expression ')'         { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); delete $3; }
+            | '(' tPUBLIC type tIDENTIFIER ')'            { $$ = new til::variable_declaration_node(LINE, tPUBLIC, $3, *$4, nullptr); delete $4; }
+            | '(' tPUBLIC type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, tPUBLIC, $3, *$4, $5); delete $4; }
+            | '(' tFORWARD type tIDENTIFIER ')'           { $$ = new til::variable_declaration_node(LINE, tFORWARD, $3, *$4, nullptr); delete $4; }
+            | '(' tEXTERNAL type tIDENTIFIER ')'          { $$ = new til::variable_declaration_node(LINE, tEXTERNAL, $3, *$4, nullptr); delete $4; }
             /* var */
-            | '(' qualifier tIDENTIFIER expression ')'      { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$3, $4); }
-            | '(' tVAR tIDENTIFIER expression ')'           { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); }
-            | '(' qualifier tVAR tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, $2, nullptr, *$4, $5); }
+            | '(' tVAR tIDENTIFIER expression ')'         { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); delete $3; }
+            | '(' tPUBLIC tVAR tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, tPUBLIC, nullptr, *$4, $5); delete $4; }
+            | '(' tPUBLIC tIDENTIFIER expression ')'      { $$ = new til::variable_declaration_node(LINE, tPUBLIC, nullptr, *$3, $4); delete $3; }
             ;
 
 declarations : declaration              { $$ = new cdk::sequence_node(LINE, $1); }
              | declarations declaration { $$ = new cdk::sequence_node(LINE, $2, $1); }
              ;
 
-qualifier : tPUBLIC   { $$ = tPUBLIC; }
-          | tFORWARD  { $$ = tFORWARD; }
-          | tEXTERNAL { $$ = tEXTERNAL; }
-          ;
-
-argument_declaration : '(' type tIDENTIFIER ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); }
+argument_declaration : '(' type tIDENTIFIER ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); delete $3; }
                      ;
 
 argument_declarations : argument_declaration                       { $$ = new cdk::sequence_node(LINE, $1); }
@@ -119,7 +114,7 @@ data_type : tTYPE_INT     { $$ = cdk::primitive_type::create(4, cdk::TYPE_INT); 
           ;
 
 function_type : '(' type ')'               { $$ = cdk::functional_type::create($2); }
-              | '(' type '(' types ')' ')' { $$ = cdk::functional_type::create(*$4, $2); }
+              | '(' type '(' types ')' ')' { $$ = cdk::functional_type::create(*$4, $2); delete $4; }
               | function_type '!'          { $$ = cdk::reference_type::create(4, $1); }
               ;
 
@@ -154,7 +149,7 @@ instructions : instruction              { $$ = new cdk::sequence_node(LINE, $1);
 
 expression : tINTEGER                           { $$ = new cdk::integer_node(LINE, $1); }
            | tDOUBLE                            { $$ = new cdk::double_node(LINE, $1); }
-           | tSTRING                            { $$ = new cdk::string_node(LINE, $1); }
+           | tSTRING                            { $$ = new cdk::string_node(LINE, $1); delete $1; }
            | tNULL                              { $$ = new til::nullptr_node(LINE); }
            /* unary expressions */
            | '(' '-' expression ')'             { $$ = new cdk::unary_minus_node(LINE, $3); }
@@ -197,7 +192,7 @@ expressions : expression             { $$ = new cdk::sequence_node(LINE, $1); }
             | expressions expression { $$ = new cdk::sequence_node(LINE, $2, $1); }
             ;
 
-lvalue : tIDENTIFIER                          { $$ = new cdk::variable_node(LINE, $1); }
+lvalue : tIDENTIFIER                          { $$ = new cdk::variable_node(LINE, $1); delete $1; }
        | '(' tINDEX expression expression ')' { $$ = new til::index_node(LINE, $3, $4); }
        ;
 
