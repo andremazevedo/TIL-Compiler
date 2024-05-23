@@ -52,14 +52,16 @@ void til::postfix_writer::do_string_node(cdk::string_node * const node, int lvl)
   _pf.SSTRING(node->value()); // output string characters
 
   // TODO
-  
-  // /* leave the address on the stack */
-  // _pf.TEXT(); // return to the TEXT segment
-  // _pf.ADDR(mklbl(lbl1)); // the string to be printed
-
-  // global variable initializer
-  _pf.DATA();
-  _pf.SADDR(mklbl(lbl1));
+  if (_inFunctionBody) {
+    /* leave the address on the stack */
+    _pf.TEXT(); // return to the TEXT segment
+    _pf.ADDR(mklbl(lbl1)); // the string to be printed
+  }
+  else {
+    // global variable initializer
+    _pf.DATA();
+    _pf.SADDR(mklbl(lbl1));
+  }
 }
 
 //---------------------------------------------------------------------------
