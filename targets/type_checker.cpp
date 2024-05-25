@@ -251,11 +251,6 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
-  const std::string &id = node->identifier();
-  auto symbol = til::make_symbol(node->type(), id, false);
-  if (!_symtab.insert(id, symbol))
-    throw std::string("variable '" + id + "' redeclared");
-
   if (node->initializer()) {
     node->initializer()->accept(this, lvl + 2);
 
@@ -263,7 +258,8 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
       // vars are typed by their initializers
       if (node->initializer()->is_typed(cdk::TYPE_UNSPEC))
         throw std::string("unknown type for initializer.");
-      node->type(cdk::primitive_type::create(node->initializer()->type()->size(), node->initializer()->type()->name()));
+      node->type(node->initializer()->type());
+      // node->type(cdk::primitive_type::create(node->initializer()->type()->size(), node->initializer()->type()->name()));
     }
     else if (node->is_typed(cdk::TYPE_INT)) {
       if (!node->initializer()->is_typed(cdk::TYPE_INT))
@@ -282,13 +278,19 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
     }
   }
 
+  const std::string &id = node->identifier();
+  auto symbol = til::make_symbol(node->type(), id, false);
+  if (!_symtab.insert(id, symbol))
+    throw std::string("variable '" + id + "' redeclared");
+
   _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
 }
 
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_nullptr_node(til::nullptr_node *const node, int lvl) {
-  // TODO
+  ASSERT_UNSPEC;
+  node->type(cdk::reference_type::create(4, nullptr));
 }
 
 void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
@@ -306,5 +308,7 @@ void til::type_checker::do_address_of_node(til::address_of_node *const node, int
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_sizeof_node(til::sizeof_node *const node, int lvl) {
-  // TODO
+  ASSERT_UNSPEC;
+  node->expression()->accept(this, lvl + 2);
+  node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
 }

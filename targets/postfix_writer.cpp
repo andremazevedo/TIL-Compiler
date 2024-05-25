@@ -300,6 +300,7 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
   // these are just a few library function imports
   _pf.EXTERN("readi");
   _pf.EXTERN("printi");
+  _pf.EXTERN("printd");
   _pf.EXTERN("prints");
   _pf.EXTERN("println");
 }
@@ -523,7 +524,23 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
           node->initializer()->accept(this, lvl);
         }
         else if (node->is_typed(cdk::TYPE_DOUBLE)) {
-          // TODO
+          _pf.DATA();
+          _pf.ALIGN();
+          if (node->qualifier() == tPUBLIC)
+            _pf.GLOBAL(id, _pf.OBJ());
+          _pf.LABEL(id);
+
+          if (node->initializer()->is_typed(cdk::TYPE_INT)) {
+            cdk::integer_node *dclini = dynamic_cast<cdk::integer_node*>(node->initializer());
+            cdk::double_node ddi(dclini->lineno(), dclini->value());
+            ddi.accept(this, lvl);
+          }
+          else if (node->initializer()->is_typed(cdk::TYPE_DOUBLE)) {
+            node->initializer()->accept(this, lvl);
+          }
+          else {
+            std::cerr << node->lineno() << ": '" << id << "' has bad initializer for real value\n";
+          }
         }
         else if (node->is_typed(cdk::TYPE_STRING)) {
           _pf.DATA();
@@ -570,5 +587,6 @@ void til::postfix_writer::do_address_of_node(til::address_of_node *const node, i
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_sizeof_node(til::sizeof_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+  _pf.INT(node->expression()->type()->size());
 }
