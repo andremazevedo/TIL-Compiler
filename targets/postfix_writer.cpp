@@ -378,21 +378,47 @@ void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
 
 void til::postfix_writer::do_loop_node(til::loop_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  int lbl1, lbl2;
-  _pf.LABEL(mklbl(lbl1 = ++_lbl));
+
+  _loopTest.push_back(++_lbl);
+  _loopEnd.push_back(++_lbl);
+
+  _pf.LABEL(mklbl(_loopTest.back()));
   node->condition()->accept(this, lvl);
-  _pf.JZ(mklbl(lbl2 = ++_lbl));
+  _pf.JZ(mklbl(_loopEnd.back()));
   node->block()->accept(this, lvl + 2);
-  _pf.JMP(mklbl(lbl1));
-  _pf.LABEL(mklbl(lbl2));
+  _pf.JMP(mklbl(_loopTest.back()));
+  _pf.LABEL(mklbl(_loopEnd.back()));
+
+  _loopTest.pop_back();
+  _loopEnd.pop_back();
 }
 
 void til::postfix_writer::do_stop_node(til::stop_node *const node, int lvl) {
-  // TODO
+  size_t level = static_cast<size_t>(node->level());
+
+  if (level <= 0) {
+    std::cerr << node->lineno() << ": wrong level for 'stop'" << std::endl;
+  }
+  else if (level > _loopEnd.size()) {
+    std::cerr << node->lineno() << ": 'stop' outside 'loop'" << std::endl;
+  }
+  else {
+    _pf.JMP(mklbl(_loopEnd[_loopEnd.size() - level])); // jump to loop end
+  }
 }
 
 void til::postfix_writer::do_next_node(til::next_node *const node, int lvl) {
-  // TODO
+  size_t level = static_cast<size_t>(node->level());
+
+  if (level <= 0) {
+    std::cerr << node->lineno() << ": wrong level for 'next'" << std::endl;
+  }
+  else if (level > _loopTest.size()) {
+    std::cerr << node->lineno() << ": 'next' outside 'loop'" << std::endl;
+  }
+  else {
+    _pf.JMP(mklbl(_loopTest[_loopTest.size() - level])); // jump to next cycle
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -508,7 +534,7 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
           node->initializer()->accept(this, lvl);
         }
         else {
-          std::cerr << node->lineno() << ": '" << id << "' has unexpected initializer\n";
+          std::cerr << node->lineno() << ": '" << id << "' has unexpected initializer" << std::endl;
         }
       }
       else {

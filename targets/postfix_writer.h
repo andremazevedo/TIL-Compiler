@@ -4,6 +4,7 @@
 #include "targets/basic_ast_visitor.h"
 
 #include <set>
+#include <vector>
 #include <sstream>
 #include <cdk/emitters/basic_postfix_emitter.h>
 
@@ -19,6 +20,7 @@ namespace til {
 
     // semantic analysis
     bool _errors, _inFunctionArgs, _inFunctionBody;
+    std::vector<int> _loopTest, _loopEnd; // for stop/next
     int _offset; // current framepointer offset (0 means no vars defined)
 
     cdk::basic_postfix_emitter &_pf;
