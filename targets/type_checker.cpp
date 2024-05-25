@@ -259,7 +259,13 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
   if (node->initializer()) {
     node->initializer()->accept(this, lvl + 2);
 
-    if (node->is_typed(cdk::TYPE_INT)) {
+    if (!node->type()) {
+      // vars are typed by their initializers
+      if (node->initializer()->is_typed(cdk::TYPE_UNSPEC))
+        throw std::string("unknown type for initializer.");
+      node->type(cdk::primitive_type::create(node->initializer()->type()->size(), node->initializer()->type()->name()));
+    }
+    else if (node->is_typed(cdk::TYPE_INT)) {
       if (!node->initializer()->is_typed(cdk::TYPE_INT))
         throw std::string("wrong type for initializer (integer expected).");
     }

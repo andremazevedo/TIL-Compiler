@@ -128,10 +128,12 @@ void til::frame_size_calculator::do_sequence_node(cdk::sequence_node *const node
 }
 
 void til::frame_size_calculator::do_block_node(til::block_node *const node, int lvl) {
+  _symtab.push(); // for block-local vars
   if (node->declarations())
     node->declarations()->accept(this, lvl + 2);
   if (node->instructions())
     node->instructions()->accept(this, lvl + 2);
+  _symtab.pop();
 }
 
 void til::frame_size_calculator::do_program_node(til::program_node *const node, int lvl) {
@@ -152,6 +154,7 @@ void til::frame_size_calculator::do_if_else_node(til::if_else_node *const node, 
 }
 
 void til::frame_size_calculator::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
+  ASSERT_SAFE_EXPRESSIONS;
   _localsize += node->type()->size();
 }
 
