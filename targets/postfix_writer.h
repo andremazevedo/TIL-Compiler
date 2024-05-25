@@ -15,10 +15,11 @@ namespace til {
   class postfix_writer: public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
 
-    // semantic analysis
     std::set<std::string> _functions_to_declare;
 
+    // semantic analysis
     bool _errors, _inFunctionArgs, _inFunctionBody;
+    int _offset; // current framepointer offset (0 means no vars defined)
 
     cdk::basic_postfix_emitter &_pf;
     int _lbl;
