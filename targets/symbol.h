@@ -28,11 +28,17 @@ namespace til {
     std::shared_ptr<cdk::basic_type> type() const {
       return _type;
     }
+    void set_type(std::shared_ptr<cdk::basic_type> type) {
+      _type = type;
+    }
     bool is_typed(cdk::typename_type name) const {
       return _type->name() == name;
     }
     const std::string &name() const {
       return _name;
+    }
+    bool function() const {
+      return _function;
     }
     long value() const {
       return _value;
@@ -43,8 +49,8 @@ namespace til {
     int offset() const {
       return _offset;
     }
-    int offset(int o) {
-      return _offset = o;
+    int offset(int offset) {
+      return _offset = offset;
     }
     bool global() const {
       return _offset == 0;

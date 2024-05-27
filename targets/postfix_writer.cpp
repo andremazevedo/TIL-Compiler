@@ -192,7 +192,10 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node, int l
   ASSERT_SAFE_EXPRESSIONS;
   const std::string &id = node->name();
   auto symbol = _symtab.find(id);
-  if (symbol->global()) {
+  if (symbol->function()) {
+    _functionCallName = id;
+  }
+  else if (symbol->global()) {
     _pf.ADDR(symbol->name());
     // _pf.ADDR(node->name());
   } 
@@ -212,6 +215,9 @@ void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node, int lvl) 
   } 
   else if (node->is_typed(cdk::TYPE_STRING)){
     _pf.LDINT();
+  }
+  else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
+    // let it go back to function_call_node
   }
   else {
     std::cerr << "error: cannot happen" << std::endl;
@@ -265,10 +271,13 @@ void til::postfix_writer::do_block_node(til::block_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_program_node(til::program_node *const node, int lvl) {
-  // Note that Simple doesn't have functions. Thus, it doesn't need
-  // a function node. However, it must start in the main function.
-  // The ProgramNode (representing the whole program) doubles as a
-  // main function node.
+  ASSERT_SAFE_EXPRESSIONS;
+
+  _function = new_symbol();
+  // _functions_to_declare.erase(_function->name());  // just in case
+  reset_new_symbol();
+
+  _bodyRetLabel.push(++_lbl);
 
   _symtab.push(); // scope of args
 
@@ -279,7 +288,7 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
   _pf.LABEL("_main");
 
   // compute stack size to be reserved for local variables
-  frame_size_calculator lsc(_compiler, _symtab);
+  frame_size_calculator lsc(_compiler, _symtab, _function);
   node->accept(&lsc, lvl);
   _pf.ENTER(lsc.localsize()); // total stack size reserved for local variables
 
@@ -290,19 +299,16 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
   _inFunctionBody = false;
 
   // end the main function
-  _pf.INT(0);
-  _pf.STFVAL32();
+  _pf.LABEL(mklbl(_bodyRetLabel.top()));
   _pf.LEAVE();
   _pf.RET();
+  _bodyRetLabel.pop();
 
   _symtab.pop(); // scope of arguments
 
-  // these are just a few library function imports
-  _pf.EXTERN("readi");
-  _pf.EXTERN("printi");
-  _pf.EXTERN("printd");
-  _pf.EXTERN("prints");
-  _pf.EXTERN("println");
+  // declare external functions
+  for (std::string s : _functions_to_declare)
+    _pf.EXTERN(s);
 }
 
 //---------------------------------------------------------------------------
@@ -314,6 +320,8 @@ void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node, i
     _pf.TRASH(4); // delete the evaluated value
   } else if (node->argument()->is_typed(cdk::TYPE_STRING)) {
     _pf.TRASH(4); // delete the evaluated value's address
+  } else if (node->argument()->is_typed(cdk::TYPE_VOID)) {
+    // do nothing
   } else {
     std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
     exit(1);
@@ -341,15 +349,15 @@ void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
     child->accept(this, lvl); // expression to print
     std::shared_ptr<cdk::basic_type> etype = child->type();
     if (etype->name() == cdk::TYPE_INT) {
-      // _functions_to_declare.insert("printi");
+      _functions_to_declare.insert("printi");
       _pf.CALL("printi");
       _pf.TRASH(4); // trash int
     } else if (etype->name() == cdk::TYPE_DOUBLE) {
-      // _functions_to_declare.insert("printd");
+      _functions_to_declare.insert("printd");
       _pf.CALL("printd");
       _pf.TRASH(8); // trash double
     } else if (etype->name() == cdk::TYPE_STRING) {
-      // _functions_to_declare.insert("prints");
+      _functions_to_declare.insert("prints");
       _pf.CALL("prints");
       _pf.TRASH(4); // trash char pointer
     } else {
@@ -360,7 +368,7 @@ void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
   }
 
   if (node->newline()) {
-    // _functions_to_declare.insert("println");
+    _functions_to_declare.insert("println");
     _pf.CALL("println");
   }
 }
@@ -448,17 +456,73 @@ void til::postfix_writer::do_if_else_node(til::if_else_node *const node, int lvl
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_function_definition_node(til::function_definition_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+
+ _bodyRetLabel.push(++_lbl);
+ 
+  _symtab.push(); // scope of args
+
+  if (node->arguments()) {
+    // TODO
+  }
+
+  // compute stack size to be reserved for local variables
+  frame_size_calculator lsc(_compiler, _symtab, _function);
+  node->accept(&lsc, lvl);
+  _pf.ENTER(lsc.localsize()); // total stack size reserved for local variables
+
+  _offset = 0; // prepare for local variable
+
+  _inFunctionBody = true;
+  os() << "        ;; before body " << std::endl;
+  node->block()->accept(this, lvl);
+  os() << "        ;; after body " << std::endl;
+  _inFunctionBody = false;
+
+  _pf.LABEL(mklbl(_bodyRetLabel.top()));
+  _pf.LEAVE();
+  _pf.RET();
+  _bodyRetLabel.pop();
+
+  _symtab.pop(); // scope of arguments
 }
 
 void til::postfix_writer::do_function_call_node(til::function_call_node *const node, int lvl) {
+  ASSERT_SAFE_EXPRESSIONS;
+
+  node->expression()->accept(this, lvl + 2);
+
+  _pf.CALL(_functionCallName);
+
+  if (node->is_typed(cdk::TYPE_INT) || node->is_typed(cdk::TYPE_STRING)) {
+    _pf.LDFVAL32();
+  }
+  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+    _pf.LDFVAL64();
+  }
   // TODO
 }
 
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_return_node(til::return_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+
+  if (node->retval()) {
+    node->retval()->accept(this, lvl);
+
+    if (node->retval()->is_typed(cdk::TYPE_INT) || node->retval()->is_typed(cdk::TYPE_STRING)) {
+      _pf.STFVAL32();
+    }
+    else if (node->retval()->is_typed(cdk::TYPE_DOUBLE)) {
+      _pf.STFVAL64();
+    }
+    else {
+      std::cerr << node->lineno() << ": unknown return type" << std::endl;
+    }
+  }
+
+  _pf.JMP(mklbl(_bodyRetLabel.top()));
 }
 
 //---------------------------------------------------------------------------
@@ -495,7 +559,10 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         _pf.STINT();
       }
       else if (node->is_typed(cdk::TYPE_DOUBLE)) {
-        // TODO
+        if (node->initializer()->is_typed(cdk::TYPE_INT))
+          _pf.I2D();
+        _pf.LOCAL(symbol->offset());
+        _pf.STDOUBLE();
       }
       else if (node->is_typed(cdk::TYPE_STRING)) {
         _pf.LOCAL(symbol->offset());
@@ -508,10 +575,10 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
   }
   else {
     if (node->qualifier() == tEXTERNAL) {
-      _pf.EXTERN(id);
+      _functions_to_declare.insert(id);
     }
     else if (node->qualifier() == tFORWARD) {
-      // TODO
+      _functions_to_declare.insert(id);
     }
     else {
       if (node->initializer()) {
@@ -547,6 +614,16 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
           _pf.ALIGN();
           if (node->qualifier() == tPUBLIC)
             _pf.GLOBAL(id, _pf.OBJ());
+          _pf.LABEL(id);
+          node->initializer()->accept(this, lvl);
+        }
+        else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
+          _function = symbol;
+          // _functions_to_declare.erase(_function->name());  // just in case
+          _pf.TEXT();
+          _pf.ALIGN();
+          if (node->qualifier() == tPUBLIC) 
+            _pf.GLOBAL(id, _pf.FUNC());
           _pf.LABEL(id);
           node->initializer()->accept(this, lvl);
         }

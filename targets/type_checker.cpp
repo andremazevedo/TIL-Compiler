@@ -3,6 +3,8 @@
 #include ".auto/all_nodes.h"  // automatically generated
 #include <cdk/types/primitive_type.h>
 
+#include "til_parser.tab.h"
+
 #define ASSERT_UNSPEC { if (node->type() != nullptr && !node->is_typed(cdk::TYPE_UNSPEC)) return; }
 
 //---------------------------------------------------------------------------
@@ -183,7 +185,9 @@ void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_program_node(til::program_node *const node, int lvl) {
-  // EMPTY
+  auto symbol = til::make_symbol(node->type(), "_main", true);
+  _symtab.insert("_main", symbol);
+  _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
 }
 
 void til::type_checker::do_evaluation_node(til::evaluation_node *const node, int lvl) {
@@ -239,18 +243,50 @@ void til::type_checker::do_function_definition_node(til::function_definition_nod
 }
 
 void til::type_checker::do_function_call_node(til::function_call_node *const node, int lvl) {
-  // TODO
+  ASSERT_UNSPEC;
+  node->expression()->accept(this, lvl + 2);
+
+  if (!node->expression()->is_typed(cdk::TYPE_FUNCTIONAL))
+    throw std::string("expression cannot be used as a function");
+
+  node->type(cdk::functional_type::cast(node->expression()->type())->output(0));
 }
 
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
-  // TODO
+  if (node->retval()) {
+    if (cdk::functional_type::cast(_function->type())->output(0)->name() == cdk::TYPE_VOID)
+      throw std::string("return value specified for void function.");
+
+    node->retval()->accept(this, lvl + 2);
+
+    if (cdk::functional_type::cast(_function->type())->output(0)->name() == cdk::TYPE_INT) {
+      if (!node->retval()->is_typed(cdk::TYPE_INT))
+        throw std::string("wrong type for return value (integer expected).");
+    }
+    else if (cdk::functional_type::cast(_function->type())->output(0)->name() == cdk::TYPE_DOUBLE) {
+      if (!(node->retval()->is_typed(cdk::TYPE_INT) || node->retval()->is_typed(cdk::TYPE_DOUBLE)))
+        throw std::string("wrong type for return value (integer or double expected).");
+    }
+    else if (cdk::functional_type::cast(_function->type())->output(0)->name() == cdk::TYPE_STRING) {
+      if (!node->retval()->is_typed(cdk::TYPE_STRING))
+        throw std::string("wrong type for return value (string expected).");
+    }
+    else {
+      throw std::string("unknown type for return value.");
+    }
+  }
 }
 
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
+  if (node->qualifier() == tEXTERNAL) {
+    if (!node->is_typed(cdk::TYPE_FUNCTIONAL))
+      throw std::string("wrong type for external variable (function expected).");
+  }
+  
   if (node->initializer()) {
     node->initializer()->accept(this, lvl + 2);
 
@@ -273,13 +309,23 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
       if (!node->initializer()->is_typed(cdk::TYPE_STRING))
         throw std::string("wrong type for initializer (string expected).");
     }
+    else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
+      if (!node->initializer()->is_typed(cdk::TYPE_FUNCTIONAL))
+        throw std::string("wrong type for initializer (function expected).");
+
+      // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match) 
+      if (cdk::functional_type::cast(node->initializer()->type())->output(0) != cdk::functional_type::cast(node->type())->output(0))
+        throw std::string("wrong type for initializer output.");
+      
+      // TODO: arguments/inputs
+    }
     else {
       throw std::string("unknown type for initializer.");
     }
   }
 
   const std::string &id = node->identifier();
-  auto symbol = til::make_symbol(node->type(), id, false);
+  auto symbol = til::make_symbol(node->type(), id, node->is_typed(cdk::TYPE_FUNCTIONAL));
   if (!_symtab.insert(id, symbol))
     throw std::string("variable '" + id + "' redeclared");
 

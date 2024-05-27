@@ -10,6 +10,15 @@
 #define yylex()                      compiler->scanner()->scan()
 #define yyerror(compiler, s)         compiler->scanner()->error(s)
 //-- don't change *any* of these --- END!
+
+std::vector<std::shared_ptr<cdk::basic_type>> sequenceToTypes(cdk::sequence_node *const node) {
+  std::vector<std::shared_ptr<cdk::basic_type>> types;
+
+  for (size_t i = 0; i < node->size(); i++)
+      types.push_back(dynamic_cast<cdk::typed_node*>(node->node(i))->type());
+
+  return types;
+}
 %}
 
 %parse-param {std::shared_ptr<cdk::compiler> compiler}
@@ -94,8 +103,8 @@ argument_declarations : argument_declaration                       { $$ = new cd
 program : '(' tPROGRAM block ')' { $$ = new til::program_node(LINE, $3); }
         ;
 
-function : '(' tFUNCTION '(' type ')' block ')'                       { $$ = new til::function_definition_node(LINE, $4, nullptr, $6); }
-         | '(' tFUNCTION '(' type argument_declarations ')' block ')' { $$ = new til::function_definition_node(LINE, $4, $5, $7); }
+function : '(' tFUNCTION '(' type ')' block ')'                       { $$ = new til::function_definition_node(LINE, cdk::functional_type::create($4), nullptr, $6); }
+         | '(' tFUNCTION '(' type argument_declarations ')' block ')' { $$ = new til::function_definition_node(LINE, cdk::functional_type::create(sequenceToTypes($5), $4), $5, $7); }
          ;
 
 type : data_type     { $$ = $1; }

@@ -10,12 +10,14 @@ namespace til {
 
   class frame_size_calculator: public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
+    std::shared_ptr<til::symbol> _function;
 
     size_t _localsize;
 
   public:
-    frame_size_calculator(std::shared_ptr<cdk::compiler> compiler, cdk::symbol_table<til::symbol> &symtab) :
-        basic_ast_visitor(compiler), _symtab(symtab), _localsize(0) {
+    frame_size_calculator(std::shared_ptr<cdk::compiler> compiler, cdk::symbol_table<til::symbol> &symtab, 
+                          std::shared_ptr<til::symbol> function) :
+        basic_ast_visitor(compiler), _symtab(symtab), _function(function), _localsize(0) {
     }
 
   public:
