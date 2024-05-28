@@ -22,8 +22,8 @@ namespace til {
     // semantic analysis
     bool _errors, _inFunctionArgs, _inFunctionBody;
     std::vector<int> _loopTest, _loopEnd; // for stop/next
-    std::string _functionCallName; // for function calls
-    std::shared_ptr<til::symbol> _function; // for keeping track of the current function and its arguments
+    std::shared_ptr<til::symbol> _function; // for keeping track of the current function
+    std::shared_ptr<til::symbol> _functionCall; // for keeping track of the function being called
     int _offset; // current framepointer offset (0 means no vars defined)
 
     std::stack<int> _bodyRetLabel; // where to jump when a return occurs

@@ -193,7 +193,7 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node, int l
   const std::string &id = node->name();
   auto symbol = _symtab.find(id);
   if (symbol->function()) {
-    _functionCallName = id;
+    _functionCall = symbol;
   }
   else if (symbol->global()) {
     _pf.ADDR(symbol->name());
@@ -274,7 +274,7 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
   ASSERT_SAFE_EXPRESSIONS;
 
   _function = new_symbol();
-  // _functions_to_declare.erase(_function->name());  // just in case
+  // _functions_to_declare.erase("_main");  // just in case
   reset_new_symbol();
 
   _bodyRetLabel.push(++_lbl);
@@ -462,9 +462,13 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
  
   _symtab.push(); // scope of args
 
+  _offset = 8; // prepare for arguments (4: remember to account for return address)
+
+  _inFunctionArgs = true;
   if (node->arguments()) {
-    // TODO
+    node->arguments()->accept(this, lvl + 4);
   }
+  _inFunctionArgs = false;
 
   // compute stack size to be reserved for local variables
   frame_size_calculator lsc(_compiler, _symtab, _function);
@@ -475,7 +479,7 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
 
   _inFunctionBody = true;
   os() << "        ;; before body " << std::endl;
-  node->block()->accept(this, lvl);
+  node->block()->accept(this, lvl + 2);
   os() << "        ;; after body " << std::endl;
   _inFunctionBody = false;
 
@@ -492,7 +496,22 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
 
   node->expression()->accept(this, lvl + 2);
 
-  _pf.CALL(_functionCallName);
+  int argsSize = 0;
+  if (node->arguments()) {
+    for (int i = node->arguments()->size() - 1; i >= 0; i--) {
+      auto argument = dynamic_cast<cdk::expression_node*>(node->arguments()->node(i));
+      auto functionCall_type = cdk::functional_type::cast(_functionCall->type());
+
+      argument->accept(this, lvl + 2);
+      if (functionCall_type->input(i)->name() == cdk::TYPE_DOUBLE && argument->is_typed(cdk::TYPE_INT))
+        _pf.I2D();
+      argsSize += functionCall_type->input(i)->size();
+    }
+  }
+
+  _pf.CALL(_functionCall->name());
+  if (argsSize)
+    _pf.TRASH(argsSize);
 
   if (node->is_typed(cdk::TYPE_INT) || node->is_typed(cdk::TYPE_STRING)) {
     _pf.LDFVAL32();
@@ -536,10 +555,12 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
   if (_inFunctionBody) {
     _offset -= typesize;
     offset = _offset;
-  } else if (_inFunctionArgs) {
+  } 
+  else if (_inFunctionArgs) {
     offset = _offset;
     _offset += typesize;
-  } else {
+  } 
+  else {
     offset = 0; // global variable
   }
 
@@ -573,6 +594,9 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
       }
     }
   }
+  else if (_inFunctionArgs) {
+    // if we are dealing with function arguments, then no action is needed
+  }
   else {
     if (node->qualifier() == tEXTERNAL) {
       _functions_to_declare.insert(id);
@@ -581,6 +605,8 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
       _functions_to_declare.insert(id);
     }
     else {
+      _functions_to_declare.erase(id);  // just in case
+
       if (node->initializer()) {
         if (node->is_typed(cdk::TYPE_INT)) {
           _pf.DATA();
@@ -619,7 +645,6 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         }
         else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
           _function = symbol;
-          // _functions_to_declare.erase(_function->name());  // just in case
           _pf.TEXT();
           _pf.ALIGN();
           if (node->qualifier() == tPUBLIC) 

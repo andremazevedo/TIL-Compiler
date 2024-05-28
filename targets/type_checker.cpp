@@ -185,7 +185,7 @@ void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_program_node(til::program_node *const node, int lvl) {
-  auto symbol = til::make_symbol(node->type(), "_main", true);
+  auto symbol = til::make_symbol(node->type(), "_main", false);
   _symtab.insert("_main", symbol);
   _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
 }
@@ -249,7 +249,33 @@ void til::type_checker::do_function_call_node(til::function_call_node *const nod
   if (!node->expression()->is_typed(cdk::TYPE_FUNCTIONAL))
     throw std::string("expression cannot be used as a function");
 
-  node->type(cdk::functional_type::cast(node->expression()->type())->output(0));
+  auto expression_type = cdk::functional_type::cast(node->expression()->type());
+
+  node->type(expression_type->output(0));
+
+  if (node->arguments()) {
+    if (expression_type->input_length() == node->arguments()->size()) {
+      for (size_t i = 0; i < node->arguments()->size(); i++) {
+        auto argument = dynamic_cast<cdk::expression_node*>(node->arguments()->node(i));
+        argument->accept(this, lvl + 2);
+        
+        if (expression_type->input(i) == argument->type()) {
+          if (expression_type->input(i)->name() == cdk::TYPE_FUNCTIONAL) {
+            // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match)
+          }
+        }
+        else {
+          throw std::string("wrong type for input");
+        }
+      }
+    }
+    else {
+      throw std::string("wrong length for input");
+    }
+  }
+  else if (expression_type->input_length()) {
+    throw std::string("wrong length for input");
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -284,7 +310,7 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 void til::type_checker::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
   if (node->qualifier() == tEXTERNAL) {
     if (!node->is_typed(cdk::TYPE_FUNCTIONAL))
-      throw std::string("wrong type for external variable (function expected).");
+      throw std::string("wrong type for external variable (functional type expected).");
   }
   
   if (node->initializer()) {
@@ -313,11 +339,38 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
       if (!node->initializer()->is_typed(cdk::TYPE_FUNCTIONAL))
         throw std::string("wrong type for initializer (function expected).");
 
-      // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match) 
-      if (cdk::functional_type::cast(node->initializer()->type())->output(0) != cdk::functional_type::cast(node->type())->output(0))
+      auto initializer_type = cdk::functional_type::cast(node->initializer()->type());
+      auto node_type = cdk::functional_type::cast(node->type());
+
+      // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match)
+      // TODO: RECUSIVE CHECKING
+      // TODO: check for doubles as well 
+      if (node_type->output(0) == initializer_type->output(0)) {
+        if (node_type->output(0)->name() == cdk::TYPE_FUNCTIONAL) {
+          // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match)
+        }
+      }
+      else {
         throw std::string("wrong type for initializer output.");
+      }
       
-      // TODO: arguments/inputs
+      // arguments/inputs
+      if (node_type->input_length() == initializer_type->input_length()) {
+        for (size_t i = 0; i < initializer_type->input_length(); i++) {
+          if (node_type->input(i) == initializer_type->input(i)) {
+            if (node_type->input(i)->name() == cdk::TYPE_FUNCTIONAL) {
+              // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match)
+            }
+          }
+          else {
+            throw std::string("wrong type for initializer input.");
+          }
+        }
+      }
+      else {
+        throw std::string("wrong length for initializer input.");
+      }
+
     }
     else {
       throw std::string("unknown type for initializer.");
@@ -325,11 +378,24 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
   }
 
   const std::string &id = node->identifier();
-  auto symbol = til::make_symbol(node->type(), id, node->is_typed(cdk::TYPE_FUNCTIONAL));
-  if (!_symtab.insert(id, symbol))
-    throw std::string("variable '" + id + "' redeclared");
+  auto symbol = til::make_symbol(node->type(), id, node->qualifier() == tFORWARD);
 
-  _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
+  auto previous = _symtab.find(id);
+  if (previous) {
+    if (previous->forward()) {
+      // TODO: check compatibility of types
+      _symtab.replace(id, symbol);
+      _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
+    }
+    else {
+      throw std::string("variable '" + id + "' redeclared");
+    }
+  }
+  else {
+    _symtab.insert(id, symbol);
+    _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
+  }
+  
 }
 
 //---------------------------------------------------------------------------

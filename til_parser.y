@@ -56,9 +56,9 @@ std::vector<std::shared_ptr<cdk::basic_type>> sequenceToTypes(cdk::sequence_node
 %token <d> tDOUBLE
 %token <s> tIDENTIFIER tSTRING
 
-%type <basic> declaration argument_declaration program instruction
+%type <basic> program declaration block_declaration argument_declaration instruction
 %type <expression> expression function
-%type <sequence> file declarations expressions argument_declarations instructions
+%type <sequence> file declarations block_declarations argument_declarations instructions expressions
 %type <lvalue> lvalue
 
 %type <block> block
@@ -77,14 +77,12 @@ file : /* empty */          { compiler->ast($$ = new cdk::sequence_node(LINE)); 
      | declarations program { compiler->ast($$ = new cdk::sequence_node(LINE, $2, $1)); }
      ;
 
-declaration : '(' type tIDENTIFIER ')'                    { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); delete $3; }
-            | '(' type tIDENTIFIER expression ')'         { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); delete $3; }
+declaration : block_declaration                           { $$ = $1; }
             | '(' tPUBLIC type tIDENTIFIER ')'            { $$ = new til::variable_declaration_node(LINE, tPUBLIC, $3, *$4, nullptr); delete $4; }
             | '(' tPUBLIC type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, tPUBLIC, $3, *$4, $5); delete $4; }
             | '(' tFORWARD type tIDENTIFIER ')'           { $$ = new til::variable_declaration_node(LINE, tFORWARD, $3, *$4, nullptr); delete $4; }
             | '(' tEXTERNAL type tIDENTIFIER ')'          { $$ = new til::variable_declaration_node(LINE, tEXTERNAL, $3, *$4, nullptr); delete $4; }
             /* var */
-            | '(' tVAR tIDENTIFIER expression ')'         { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); delete $3; }
             | '(' tPUBLIC tVAR tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, tPUBLIC, nullptr, *$4, $5); delete $4; }
             | '(' tPUBLIC tIDENTIFIER expression ')'      { $$ = new til::variable_declaration_node(LINE, tPUBLIC, nullptr, *$3, $4); delete $3; }
             ;
@@ -92,6 +90,16 @@ declaration : '(' type tIDENTIFIER ')'                    { $$ = new til::variab
 declarations : declaration              { $$ = new cdk::sequence_node(LINE, $1); }
              | declarations declaration { $$ = new cdk::sequence_node(LINE, $2, $1); }
              ;
+
+block_declaration : argument_declaration                { $$ = $1; }
+                  | '(' type tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, $4); delete $3; }
+                  /* var */
+                  | '(' tVAR tIDENTIFIER expression ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, nullptr, *$3, $4); delete $3; }
+                  ;
+
+block_declarations : block_declaration                    { $$ = new cdk::sequence_node(LINE, $1); }
+                   | block_declarations block_declaration { $$ = new cdk::sequence_node(LINE, $2, $1); }
+                   ;
 
 argument_declaration : '(' type tIDENTIFIER ')' { $$ = new til::variable_declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); delete $3; }
                      ;
@@ -131,10 +139,10 @@ void_type : tTYPE_VOID    { $$ = cdk::primitive_type::create(0, cdk::TYPE_VOID);
           | void_type '!' { $$ = cdk::reference_type::create(4, cdk::primitive_type::create(0, cdk::TYPE_VOID)); }
           ;
 
-block : /* empty */               { $$ = new til::block_node(LINE, nullptr, nullptr); }
-      | declarations              { $$ = new til::block_node(LINE, $1, nullptr); }
-      | instructions              { $$ = new til::block_node(LINE, nullptr, $1); }
-      | declarations instructions { $$ = new til::block_node(LINE, $1, $2); }
+block : /* empty */                     { $$ = new til::block_node(LINE, nullptr, nullptr); }
+      | block_declarations              { $$ = new til::block_node(LINE, $1, nullptr); }
+      | instructions                    { $$ = new til::block_node(LINE, nullptr, $1); }
+      | block_declarations instructions { $$ = new til::block_node(LINE, $1, $2); }
       ;
 
 instruction : '(' tBLOCK block ')'                           { $$ = $3; }
