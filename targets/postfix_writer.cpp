@@ -81,32 +81,76 @@ void til::postfix_writer::do_unary_plus_node(cdk::unary_plus_node *const node, i
 
 void til::postfix_writer::do_add_node(cdk::add_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->left()->accept(this, lvl);
-  node->right()->accept(this, lvl);
-  _pf.ADD();
+
+  node->left()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->left()->is_typed(cdk::TYPE_INT)) {
+    _pf.I2D();
+  }
+
+  node->right()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT)) {
+    _pf.I2D();
+  }
+
+  if (node->is_typed(cdk::TYPE_DOUBLE))
+    _pf.DADD();
+  else
+    _pf.ADD();
 }
 void til::postfix_writer::do_sub_node(cdk::sub_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->left()->accept(this, lvl);
-  node->right()->accept(this, lvl);
-  _pf.SUB();
+
+  node->left()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->left()->is_typed(cdk::TYPE_INT)) {
+    _pf.I2D();
+  }
+
+  node->right()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT)) {
+    _pf.I2D();
+  }
+
+  if (node->is_typed(cdk::TYPE_DOUBLE))
+    _pf.DSUB();
+  else
+    _pf.SUB();
 }
 void til::postfix_writer::do_mul_node(cdk::mul_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->left()->accept(this, lvl);
-  node->right()->accept(this, lvl);
-  _pf.MUL();
+
+  node->left()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->left()->is_typed(cdk::TYPE_INT))
+    _pf.I2D();
+
+  node->right()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT))
+    _pf.I2D();
+
+  if (node->is_typed(cdk::TYPE_DOUBLE))
+    _pf.DMUL();
+  else
+    _pf.MUL();
 }
 void til::postfix_writer::do_div_node(cdk::div_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->left()->accept(this, lvl);
-  node->right()->accept(this, lvl);
-  _pf.DIV();
+
+  node->left()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->left()->is_typed(cdk::TYPE_INT))
+    _pf.I2D();
+
+  node->right()->accept(this, lvl + 2);
+  if (node->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT))
+    _pf.I2D();
+
+  if (node->is_typed(cdk::TYPE_DOUBLE))
+    _pf.DDIV();
+  else
+    _pf.DIV();
 }
 void til::postfix_writer::do_mod_node(cdk::mod_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->left()->accept(this, lvl);
-  node->right()->accept(this, lvl);
+  node->left()->accept(this, lvl + 2);
+  node->right()->accept(this, lvl + 2);
   _pf.MOD();
 }
 void til::postfix_writer::do_lt_node(cdk::lt_node *const node, int lvl) {
@@ -150,7 +194,7 @@ void til::postfix_writer::do_eq_node(cdk::eq_node *const node, int lvl) {
 
 void til::postfix_writer::do_not_node(cdk::not_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->argument()->accept(this, lvl); // determine the value
+  node->argument()->accept(this, lvl + 2);
   _pf.INT(0);
   _pf.EQ();
 }
@@ -527,14 +571,25 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
 void til::postfix_writer::do_return_node(til::return_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
 
-  if (node->retval()) {
+  auto function_type = cdk::functional_type::cast(_function->type());
+
+  // should not reach here without returning a value (if not void)
+  if (function_type->output(0)->name() != cdk::TYPE_VOID) {
     node->retval()->accept(this, lvl);
 
-    if (node->retval()->is_typed(cdk::TYPE_INT) || node->retval()->is_typed(cdk::TYPE_STRING)) {
+    if (function_type->output(0)->name() == cdk::TYPE_INT) {
       _pf.STFVAL32();
     }
-    else if (node->retval()->is_typed(cdk::TYPE_DOUBLE)) {
+    else if (function_type->output(0)->name() == cdk::TYPE_DOUBLE) {
+      if (node->retval()->is_typed(cdk::TYPE_INT))
+        _pf.I2D();
       _pf.STFVAL64();
+    }
+    else if (function_type->output(0)->name() == cdk::TYPE_STRING) {
+      _pf.STFVAL32();
+    }
+    else if (function_type->output(0)->name() == cdk::TYPE_POINTER) {
+      _pf.STFVAL32();
     }
     else {
       std::cerr << node->lineno() << ": unknown return type" << std::endl;
