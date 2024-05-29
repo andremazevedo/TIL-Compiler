@@ -350,11 +350,11 @@ void til::type_checker::do_loop_node(til::loop_node *const node, int lvl) {
 }
 
 void til::type_checker::do_stop_node(til::stop_node *const node, int lvl) {
-  // TODO
+  // EMPTY
 }
 
 void til::type_checker::do_next_node(til::next_node *const node, int lvl) {
-  // TODO
+  // EMPTY
 }
 
 //---------------------------------------------------------------------------
@@ -420,9 +420,9 @@ void til::type_checker::do_function_call_node(til::function_call_node *const nod
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
-  if (node->retval()) {
-    auto function_type = cdk::functional_type::cast(_function->type());
+  auto function_type = cdk::functional_type::cast(_function->type());
 
+  if (node->retval()) {
     if (function_type->output(0)->name() == cdk::TYPE_VOID)
       throw std::string("return value specified for void function.");
 
@@ -441,11 +441,23 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
         throw std::string("wrong type for return value (string expected).");
     }
     else if (function_type->output(0)->name() == cdk::TYPE_POINTER) {
-      // TODO
+      if (!node->retval()->is_typed(cdk::TYPE_POINTER))
+        throw std::string("wrong type for return value (pointer expected).");
+
+      auto retval_type = cdk::reference_type::cast(node->retval()->type());
+      // auto function_output_type = cdk::reference_type::cast(function_type->output(0));
+      
+      if (retval_type->referenced()->name() == cdk::TYPE_UNSPEC)
+        node->retval()->type(function_type->output(0));
+
+      // TODO: check if pointers are compatible
     }
     else {
       throw std::string("unknown type for return value.");
     }
+  }
+  else if (function_type->output(0)->name() != cdk::TYPE_VOID) {
+    throw std::string("no return value for non-void function.");
   }
 }
 
@@ -588,7 +600,9 @@ void til::type_checker::do_stack_alloc_node(til::stack_alloc_node *const node, i
 }
 
 void til::type_checker::do_address_of_node(til::address_of_node *const node, int lvl) {
-  // TODO
+  ASSERT_UNSPEC;
+  node->lvalue()->accept(this, lvl + 2);
+  node->type(cdk::reference_type::create(4, node->lvalue()->type()));
 }
 
 //---------------------------------------------------------------------------

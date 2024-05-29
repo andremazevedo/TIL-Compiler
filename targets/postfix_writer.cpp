@@ -267,7 +267,6 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node, int l
   }
   else if (symbol->global()) {
     _pf.ADDR(symbol->name());
-    // _pf.ADDR(node->name());
   } 
   else {
     _pf.LOCAL(symbol->offset());
@@ -556,13 +555,12 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
   if (argsSize)
     _pf.TRASH(argsSize);
 
-  if (node->is_typed(cdk::TYPE_INT) || node->is_typed(cdk::TYPE_STRING)) {
-    _pf.LDFVAL32();
-  }
-  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+  if (node->is_typed(cdk::TYPE_DOUBLE)) {
     _pf.LDFVAL64();
   }
-  // TODO
+  else if (!node->is_typed(cdk::TYPE_VOID)) {
+    _pf.LDFVAL32();
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -760,7 +758,9 @@ void til::postfix_writer::do_stack_alloc_node(til::stack_alloc_node *const node,
 }
 
 void til::postfix_writer::do_address_of_node(til::address_of_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+  // since the argument is an lvalue, it is already an address
+  node->lvalue()->accept(this, lvl + 2);
 }
 
 //---------------------------------------------------------------------------
