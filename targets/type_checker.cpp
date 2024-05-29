@@ -127,7 +127,7 @@ void til::type_checker::do_IntDoubleExpression(cdk::binary_operation_node *const
   }
 }
 
-void til::type_checker::do_IntDoublePointerExpression(cdk::binary_operation_node *const node, int lvl) {
+void til::type_checker::do_IntDoublePointerExpression(cdk::binary_operation_node *const node, int lvl, bool sub = false) {
   ASSERT_UNSPEC;
   node->left()->accept(this, lvl + 2);
   node->right()->accept(this, lvl + 2);
@@ -143,6 +143,10 @@ void til::type_checker::do_IntDoublePointerExpression(cdk::binary_operation_node
   }
   else if (node->left()->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT)) {
     node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+  }
+  else if (sub && node->left()->is_typed(cdk::TYPE_POINTER) && node->right()->is_typed(cdk::TYPE_POINTER)) {
+    // TODO: check if pointers are compatible
+    node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
   }
   else if (node->left()->is_typed(cdk::TYPE_POINTER) && node->right()->is_typed(cdk::TYPE_INT)) {
     node->type(node->left()->type());
@@ -178,7 +182,7 @@ void til::type_checker::do_add_node(cdk::add_node *const node, int lvl) {
   do_IntDoublePointerExpression(node, lvl);
 }
 void til::type_checker::do_sub_node(cdk::sub_node *const node, int lvl) {
-  do_IntDoublePointerExpression(node, lvl);
+  do_IntDoublePointerExpression(node, lvl, true);
 }
 void til::type_checker::do_mul_node(cdk::mul_node *const node, int lvl) {
   do_IntDoubleExpression(node, lvl);
@@ -254,14 +258,53 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node, int
   node->rvalue()->accept(this, lvl + 4);
 
   if (node->lvalue()->is_typed(cdk::TYPE_INT)) {
-    if (!node->rvalue()->is_typed(cdk::TYPE_INT))
+    if (node->rvalue()->is_typed(cdk::TYPE_INT)) {
+      node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    }
+    else if (node->rvalue()->is_typed(cdk::TYPE_UNSPEC)) {
+      node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+      node->rvalue()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    }
+    else {
       throw std::string("wrong assignment to integer");
-    node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    }
   }
   else if (node->lvalue()->is_typed(cdk::TYPE_DOUBLE)) {
-    if (!(node->rvalue()->is_typed(cdk::TYPE_INT) || node->rvalue()->is_typed(cdk::TYPE_DOUBLE)))
+    if (node->rvalue()->is_typed(cdk::TYPE_DOUBLE) || node->rvalue()->is_typed(cdk::TYPE_INT)) {
+      node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+    }
+    else if (node->rvalue()->is_typed(cdk::TYPE_UNSPEC)) {
+      node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+      node->rvalue()->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+    }
+    else {
       throw std::string("wrong assignment to real");
-    node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+    }
+  }
+  else if (node->lvalue()->is_typed(cdk::TYPE_STRING)) {
+    if (node->rvalue()->is_typed(cdk::TYPE_STRING)) {
+      node->type(cdk::primitive_type::create(4, cdk::TYPE_STRING));
+    }
+    else if (node->rvalue()->is_typed(cdk::TYPE_UNSPEC)) {
+      node->type(cdk::primitive_type::create(4, cdk::TYPE_STRING));
+      node->rvalue()->type(cdk::primitive_type::create(4, cdk::TYPE_STRING));
+    }
+    else {
+      throw std::string("wrong assignment to string");
+    }
+  }
+  else if (node->lvalue()->is_typed(cdk::TYPE_POINTER)) {
+    if (!node->rvalue()->is_typed(cdk::TYPE_POINTER)) {
+      throw std::string("wrong assignment to pointer");
+    }
+
+    auto rvalue_type = cdk::reference_type::cast(node->rvalue()->type());
+
+    if (rvalue_type->referenced()->name() == cdk::TYPE_UNSPEC) {
+      node->rvalue()->type(node->lvalue()->type());
+    }
+
+    node->type(node->lvalue()->type());
   }
   else {
     throw std::string("wrong types in assignment");
@@ -436,6 +479,16 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
       if (!node->initializer()->is_typed(cdk::TYPE_STRING))
         throw std::string("wrong type for initializer (string expected).");
     }
+    else if (node->is_typed(cdk::TYPE_POINTER)) {
+      if (!node->initializer()->is_typed(cdk::TYPE_POINTER))
+        throw std::string("wrong type for initializer (pointer expected).");
+
+      auto initializer_type = cdk::reference_type::cast(node->initializer()->type());
+      
+      if (initializer_type->referenced()->name() == cdk::TYPE_UNSPEC) {
+        node->initializer()->type(node->type());
+      }
+    }
     else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
       if (!node->initializer()->is_typed(cdk::TYPE_FUNCTIONAL))
         throw std::string("wrong type for initializer (function expected).");
@@ -503,15 +556,35 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
 
 void til::type_checker::do_nullptr_node(til::nullptr_node *const node, int lvl) {
   ASSERT_UNSPEC;
-  node->type(cdk::reference_type::create(4, nullptr));
+  node->type(cdk::reference_type::create(4, cdk::primitive_type::create(0, cdk::TYPE_UNSPEC)));
 }
 
 void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
-  // TODO
+  ASSERT_UNSPEC;
+  node->base()->accept(this, lvl + 2);
+
+  if (!node->base()->is_typed(cdk::TYPE_POINTER))
+    throw std::string("pointer expression expected in index left-value");
+
+  auto base_type = cdk::reference_type::cast(node->base()->type());
+
+  if (base_type->referenced()->name() == cdk::TYPE_FUNCTIONAL)
+    throw std::string("Cannot index function pointers.");
+
+  node->index()->accept(this, lvl + 2);
+  if (!node->index()->is_typed(cdk::TYPE_INT))
+    throw std::string("integer expression expected in left-value index");
+
+  node->type(base_type->referenced());
 }
 
 void til::type_checker::do_stack_alloc_node(til::stack_alloc_node *const node, int lvl) {
-  // TODO
+  ASSERT_UNSPEC;
+  node->argument()->accept(this, lvl + 2);
+  if (!node->argument()->is_typed(cdk::TYPE_INT))
+    throw std::string("integer expression expected in allocation expression");
+
+  node->type(cdk::reference_type::create(4, cdk::primitive_type::create(0, cdk::TYPE_UNSPEC)));
 }
 
 void til::type_checker::do_address_of_node(til::address_of_node *const node, int lvl) {

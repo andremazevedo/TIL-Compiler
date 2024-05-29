@@ -31,7 +31,7 @@ namespace til {
     void processBinaryExpression(cdk::binary_operation_node *const node, int lvl);
     void do_IntExpression(cdk::binary_operation_node *const node, int lvl);
     void do_IntDoubleExpression(cdk::binary_operation_node *const node, int lvl);
-    void do_IntDoublePointerExpression(cdk::binary_operation_node *const node, int lvl);
+    void do_IntDoublePointerExpression(cdk::binary_operation_node *const node, int lvl, bool sub);
     template<typename T>
     void process_literal(cdk::literal_node<T> *const node, int lvl) {
     }

@@ -86,10 +86,20 @@ void til::postfix_writer::do_add_node(cdk::add_node *const node, int lvl) {
   if (node->is_typed(cdk::TYPE_DOUBLE) && node->left()->is_typed(cdk::TYPE_INT)) {
     _pf.I2D();
   }
+  else if (node->is_typed(cdk::TYPE_POINTER) && node->left()->is_typed(cdk::TYPE_INT)) {
+    auto node_type = cdk::reference_type::cast(node->type());
+    _pf.INT(node_type->referenced()->size());
+    _pf.MUL();
+  }
 
   node->right()->accept(this, lvl + 2);
   if (node->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT)) {
     _pf.I2D();
+  }
+  else if (node->is_typed(cdk::TYPE_POINTER) && node->right()->is_typed(cdk::TYPE_INT)) {
+    auto node_type = cdk::reference_type::cast(node->type());
+    _pf.INT(node_type->referenced()->size());
+    _pf.MUL();
   }
 
   if (node->is_typed(cdk::TYPE_DOUBLE))
@@ -104,16 +114,32 @@ void til::postfix_writer::do_sub_node(cdk::sub_node *const node, int lvl) {
   if (node->is_typed(cdk::TYPE_DOUBLE) && node->left()->is_typed(cdk::TYPE_INT)) {
     _pf.I2D();
   }
+  else if (node->is_typed(cdk::TYPE_POINTER) && node->left()->is_typed(cdk::TYPE_INT)) {
+    auto node_type = cdk::reference_type::cast(node->type());
+    _pf.INT(node_type->referenced()->size());
+    _pf.MUL();
+  }
 
   node->right()->accept(this, lvl + 2);
   if (node->is_typed(cdk::TYPE_DOUBLE) && node->right()->is_typed(cdk::TYPE_INT)) {
     _pf.I2D();
+  }
+  else if (node->is_typed(cdk::TYPE_POINTER) && node->right()->is_typed(cdk::TYPE_INT)) {
+    auto node_type = cdk::reference_type::cast(node->type());
+    _pf.INT(node_type->referenced()->size());
+    _pf.MUL();
   }
 
   if (node->is_typed(cdk::TYPE_DOUBLE))
     _pf.DSUB();
   else
     _pf.SUB();
+
+  if (node->left()->is_typed(cdk::TYPE_POINTER) && node->right()->is_typed(cdk::TYPE_POINTER)) {
+    auto left_type = cdk::reference_type::cast(node->left()->type());
+    _pf.INT(left_type->referenced()->size());
+    _pf.DIV();
+  }
 }
 void til::postfix_writer::do_mul_node(cdk::mul_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
@@ -251,53 +277,35 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node, int l
 void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   node->lvalue()->accept(this, lvl);
-  if (node->is_typed(cdk::TYPE_INT)) {
-    _pf.LDINT();
-  }
-  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+  if (node->is_typed(cdk::TYPE_DOUBLE)) {
     _pf.LDDOUBLE();
-  } 
-  else if (node->is_typed(cdk::TYPE_STRING)){
-    _pf.LDINT();
   }
   else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
-    // let it go back to function_call_node
+    // let it pass
   }
   else {
-    std::cerr << "error: cannot happen" << std::endl;
+    _pf.LDINT();
   }
 }
 
 void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   node->rvalue()->accept(this, lvl + 2); // determine the new value
-  if (node->is_typed(cdk::TYPE_INT)) {
-    _pf.DUP32();
-  }
-  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+  if (node->is_typed(cdk::TYPE_DOUBLE)) {
     if (node->rvalue()->is_typed(cdk::TYPE_INT))
       _pf.I2D();
     _pf.DUP64();
   }
-  else if (node->is_typed(cdk::TYPE_STRING)){
-    _pf.DUP32();
-  }
   else {
-    std::cerr << "error: cannot happen" << std::endl;
+    _pf.DUP32();
   }
 
   node->lvalue()->accept(this, lvl); // where to store the value
-  if (node->is_typed(cdk::TYPE_INT)) {
-    _pf.STINT();
-  }
-  else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+  if (node->is_typed(cdk::TYPE_DOUBLE)) {
     _pf.STDOUBLE();
   }
-  else if (node->is_typed(cdk::TYPE_STRING)) {
-    _pf.STINT();
-  }
   else {
-    std::cerr << "error: cannot happen" << std::endl;
+    _pf.STINT();
   }
 }
 
@@ -359,17 +367,8 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
 
 void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
-  node->argument()->accept(this, lvl); // determine the value
-  if (node->argument()->is_typed(cdk::TYPE_INT)) {
-    _pf.TRASH(4); // delete the evaluated value
-  } else if (node->argument()->is_typed(cdk::TYPE_STRING)) {
-    _pf.TRASH(4); // delete the evaluated value's address
-  } else if (node->argument()->is_typed(cdk::TYPE_VOID)) {
-    // do nothing
-  } else {
-    std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
-    exit(1);
-  }
+  node->argument()->accept(this, lvl);
+  _pf.TRASH(node->argument()->type()->size());
 }
 
 void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
@@ -644,6 +643,10 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         _pf.LOCAL(symbol->offset());
         _pf.STINT(); 
       }
+      else if (node->is_typed(cdk::TYPE_POINTER)) {
+        _pf.LOCAL(symbol->offset());
+        _pf.STINT();
+      }
       else {
         std::cerr << "cannot initialize" << std::endl;
       }
@@ -663,6 +666,7 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
       _functions_to_declare.erase(id);  // just in case
 
       if (node->initializer()) {
+        // The initialization expression must be a literal or functional value if the variable is global.
         if (node->is_typed(cdk::TYPE_INT)) {
           _pf.DATA();
           _pf.ALIGN();
@@ -726,15 +730,33 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_nullptr_node(til::nullptr_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+  if (_inFunctionBody)
+    _pf.INT(0);
+  else
+    _pf.SINT(0);
 }
 
 void til::postfix_writer::do_index_node(til::index_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+
+  node->base()->accept(this, lvl + 2);
+  node->index()->accept(this, lvl + 2);
+  _pf.INT(node->type()->size());
+  _pf.MUL();
+  _pf.ADD();
 }
 
 void til::postfix_writer::do_stack_alloc_node(til::stack_alloc_node *const node, int lvl) {
-  // TODO
+  ASSERT_SAFE_EXPRESSIONS;
+
+  auto alloc_type = cdk::reference_type::cast(node->type());
+
+  node->argument()->accept(this, lvl + 2);
+  _pf.INT(alloc_type->referenced()->size());
+  _pf.MUL();
+  _pf.ALLOC(); // allocate
+  _pf.SP(); // put base pointer in stack
 }
 
 void til::postfix_writer::do_address_of_node(til::address_of_node *const node, int lvl) {
