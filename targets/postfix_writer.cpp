@@ -584,10 +584,18 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
 void til::postfix_writer::do_function_call_node(til::function_call_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
 
-  node->expression()->accept(this, lvl + 2);
+  std::shared_ptr<til::symbol> function_call;
 
-  auto function_call = found_symbol();
-  reset_found_symbol();
+  if (node->expression()) {
+    node->expression()->accept(this, lvl + 2);
+
+    function_call = found_symbol();
+    reset_found_symbol();
+  }
+  else {
+    // @ recursive function call
+    function_call = _functions.top();
+  }
 
   int argsSize = 0;
   if (node->arguments()) {

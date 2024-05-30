@@ -390,28 +390,39 @@ void til::type_checker::do_function_definition_node(til::function_definition_nod
 
 void til::type_checker::do_function_call_node(til::function_call_node *const node, int lvl) {
   ASSERT_UNSPEC;
-  node->expression()->accept(this, lvl + 2);
+  std::shared_ptr<cdk::functional_type> function_call_type;
 
-  if (!node->expression()->is_typed(cdk::TYPE_FUNCTIONAL))
-    throw std::string("expression cannot be used as a function");
+  if (node->expression()) {
+    node->expression()->accept(this, lvl + 2);
 
-  auto expression_type = cdk::functional_type::cast(node->expression()->type());
+    if (!node->expression()->is_typed(cdk::TYPE_FUNCTIONAL))
+      throw std::string("expression cannot be used as a function");
 
-  node->type(expression_type->output(0));
+    function_call_type = cdk::functional_type::cast(node->expression()->type());
+  }
+  else {
+    // @ recursive function call
+    if (_functions.size() == 0)
+      throw std::string("@ call outside function definition");
+    else if (_functions.top()->name() == "_main")
+      throw std::string("@ call inside program");
+
+    function_call_type = cdk::functional_type::cast(_functions.top()->type());
+  }
 
   if (node->arguments()) {
-    if (expression_type->input_length() == node->arguments()->size()) {
+    if (function_call_type->input_length() == node->arguments()->size()) {
       for (size_t i = 0; i < node->arguments()->size(); i++) {
         auto argument = dynamic_cast<cdk::expression_node*>(node->arguments()->node(i));
         argument->accept(this, lvl + 2);
         
-        if (expression_type->input(i) == argument->type()) {
-          if (expression_type->input(i)->name() == cdk::TYPE_FUNCTIONAL) {
+        if (function_call_type->input(i) == argument->type()) {
+          if (function_call_type->input(i)->name() == cdk::TYPE_FUNCTIONAL) {
             // TODO: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match)
           }
           continue;
         }
-        else if (expression_type->input(i)->name() == cdk::TYPE_DOUBLE && argument->is_typed(cdk::TYPE_INT)) {
+        else if (function_call_type->input(i)->name() == cdk::TYPE_DOUBLE && argument->is_typed(cdk::TYPE_INT)) {
           continue;
         }
         else {
@@ -423,9 +434,11 @@ void til::type_checker::do_function_call_node(til::function_call_node *const nod
       throw std::string("wrong length for input");
     }
   }
-  else if (expression_type->input_length()) {
+  else if (function_call_type->input_length()) {
     throw std::string("wrong length for input");
   }
+
+  node->type(function_call_type->output(0));
 }
 
 //---------------------------------------------------------------------------
