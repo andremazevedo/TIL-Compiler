@@ -402,43 +402,30 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
 void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   node->argument()->accept(this, lvl);
-  // std::cout << "evaluation_node: " << node->argument()->type()->size() << std::endl;
   _pf.TRASH(node->argument()->type()->size());
 }
 
 void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
-  // ASSERT_SAFE_EXPRESSIONS;
-  // node->argument()->accept(this, lvl); // determine the value to print
-  // if (node->argument()->is_typed(cdk::TYPE_INT)) {
-  //   _pf.CALL("printi");
-  //   _pf.TRASH(4); // delete the printed value
-  // } else if (node->argument()->is_typed(cdk::TYPE_STRING)) {
-  //   _pf.CALL("prints");
-  //   _pf.TRASH(4); // delete the printed value's address
-  // } else {
-  //   std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
-  //   exit(1);
-  // }
-  // _pf.CALL("println"); // print a newline
-
   for (size_t ix = 0; ix < node->arguments()->size(); ix++) {
-    auto child = dynamic_cast<cdk::expression_node*>(node->arguments()->node(ix));
+    auto argument = dynamic_cast<cdk::expression_node*>(node->arguments()->node(ix));
 
-    child->accept(this, lvl); // expression to print
-    std::shared_ptr<cdk::basic_type> etype = child->type();
-    if (etype->name() == cdk::TYPE_INT) {
+    argument->accept(this, lvl); // expression to print
+    if (argument->is_typed(cdk::TYPE_INT)) {
       _functions_to_declare.insert("printi");
       _pf.CALL("printi");
       _pf.TRASH(4); // trash int
-    } else if (etype->name() == cdk::TYPE_DOUBLE) {
+    } 
+    else if (argument->is_typed(cdk::TYPE_DOUBLE)) {
       _functions_to_declare.insert("printd");
       _pf.CALL("printd");
       _pf.TRASH(8); // trash double
-    } else if (etype->name() == cdk::TYPE_STRING) {
+    } 
+    else if (argument->is_typed(cdk::TYPE_STRING)) {
       _functions_to_declare.insert("prints");
       _pf.CALL("prints");
       _pf.TRASH(4); // trash char pointer
-    } else {
+    } 
+    else {
       std::cerr << "cannot print expression of unknown type" << std::endl;
       return;
     }
@@ -454,11 +441,18 @@ void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
-  // ASSERT_SAFE_EXPRESSIONS;
-  // _pf.CALL("readi");
-  // _pf.LDFVAL32();
-  // node->argument()->accept(this, lvl);
-  // _pf.STINT();
+  ASSERT_SAFE_EXPRESSIONS;
+
+  if (node->is_typed(cdk::TYPE_DOUBLE)) {
+    _functions_to_declare.insert("readd");
+    _pf.CALL("readd");
+    _pf.LDFVAL64();
+  }
+  else {
+    _functions_to_declare.insert("readi");
+    _pf.CALL("readi");
+    _pf.LDFVAL32();
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -708,26 +702,6 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         _pf.LOCAL(symbol->offset());
         _pf.STINT();
       }
-      // else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
-      //   //TODO do I really need this?
-      //   int _functionEnd = ++_lbl;
-      //   _pf.JMP(mklbl(_functionEnd));
-
-      //   _functions.push(symbol);
-
-      //   symbol->label(++_lbl);
-      //   node->initializer()->accept(this, lvl);
-
-      //   auto found_function = found_symbol();
-      //   if (found_function) {
-      //     symbol->label(found_function->label());
-      //     reset_found_symbol();
-      //   }
-
-      //   _functions.pop();
-
-      //   _pf.LABEL(mklbl(_functionEnd));
-      // }
       else {
         std::cerr << "cannot initialize" << std::endl;
       }
@@ -786,6 +760,7 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
           _functions.push(symbol);
 
+          symbol->label(++_lbl);
           node->initializer()->accept(this, lvl);
 
           auto found_function = found_symbol();

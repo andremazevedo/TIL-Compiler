@@ -117,7 +117,6 @@ void til::type_checker::do_IntDoubleExpression(cdk::binary_operation_node *const
     node->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
   }
   else if (node->left()->is_typed(cdk::TYPE_UNSPEC) && node->right()->is_typed(cdk::TYPE_UNSPEC)) {
-    // TODO: check if this is correct
     node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     node->left()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     node->right()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
@@ -155,7 +154,6 @@ void til::type_checker::do_IntDoublePointerExpression(cdk::binary_operation_node
     node->type(node->right()->type());
   }
   else if (node->left()->is_typed(cdk::TYPE_UNSPEC) && node->right()->is_typed(cdk::TYPE_UNSPEC)) {
-    // TODO: check if this is correct
     node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     node->left()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     node->right()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
@@ -347,11 +345,7 @@ void til::type_checker::do_print_node(til::print_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_read_node(til::read_node *const node, int lvl) {
-  // try {
-  //   node->argument()->accept(this, lvl);
-  // } catch (const std::string &id) {
-  //   throw "undeclared variable '" + id + "'";
-  // }
+  node->type(cdk::primitive_type::create(0, cdk::TYPE_UNSPEC));
 }
 
 //---------------------------------------------------------------------------
@@ -488,6 +482,9 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_variable_declaration_node(til::variable_declaration_node *const node, int lvl) {
+  if (node->type() && node->is_typed(cdk::TYPE_VOID))
+    throw std::string("variable cannot be of type void.");
+
   if (node->qualifier() == tEXTERNAL) {
     if (!node->is_typed(cdk::TYPE_FUNCTIONAL))
       throw std::string("wrong type for external variable (functional type expected).");
@@ -501,13 +498,18 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
       if (node->initializer()->is_typed(cdk::TYPE_UNSPEC))
         throw std::string("unknown type for initializer.");
       node->type(node->initializer()->type());
-      // node->type(cdk::primitive_type::create(node->initializer()->type()->size(), node->initializer()->type()->name()));
     }
     else if (node->is_typed(cdk::TYPE_INT)) {
+      if (node->initializer()->is_typed(cdk::TYPE_UNSPEC))
+        node->initializer()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+
       if (!node->initializer()->is_typed(cdk::TYPE_INT))
         throw std::string("wrong type for initializer (integer expected).");
     }
     else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+      if (node->initializer()->is_typed(cdk::TYPE_UNSPEC))
+        node->initializer()->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+
       if (!(node->initializer()->is_typed(cdk::TYPE_INT) || node->initializer()->is_typed(cdk::TYPE_DOUBLE)))
         throw std::string("wrong type for initializer (integer or double expected).");
     }
