@@ -561,6 +561,7 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
   if (previous) {
     if (previous->qualifier() == tFORWARD) {
       // TODO: check compatibility of types
+      symbol->qualifier(tPUBLIC);
       _symtab.replace(id, symbol);
       _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
     }

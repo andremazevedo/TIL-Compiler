@@ -552,9 +552,13 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
 
   _pf.TEXT();
   _pf.ALIGN();
-  if (function->qualifier() == tPUBLIC) 
-    _pf.GLOBAL(mklbl(function->label()), _pf.FUNC());
-  _pf.LABEL(mklbl(function->label()));
+  if (function->qualifier() == tPUBLIC) {
+    _pf.GLOBAL(function->name(), _pf.FUNC());
+    _pf.LABEL(function->name());
+  }
+  else {
+    _pf.LABEL(mklbl(function->label()));
+  }
 
   // compute stack size to be reserved for local variables
   frame_size_calculator lsc(_compiler, _symtab, _functions);
@@ -598,7 +602,11 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
     }
   }
 
-  _pf.CALL(mklbl(function_call->label()));
+  if (function_call->qualifier() == tPUBLIC || function_call->qualifier() == tFORWARD || function_call->qualifier() == tEXTERNAL)
+    _pf.CALL(function_call->name());
+  else
+    _pf.CALL(mklbl(function_call->label()));
+
   if (argsSize)
     _pf.TRASH(argsSize);
 
@@ -770,7 +778,6 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
           _functions.push(symbol);
 
-          symbol->label(++_lbl);
           node->initializer()->accept(this, lvl);
 
           auto found_function = found_symbol();

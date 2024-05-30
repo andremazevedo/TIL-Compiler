@@ -12,7 +12,7 @@ namespace til {
     std::shared_ptr<cdk::basic_type> _type;
     int _qualifier; // qualifiers: public, forward, external, "private" (i.e., none)
     int _offset = 0; // 0 (zero) means global variable/function
-    int _lbl; // label for the function
+    int _lbl = 0; // label for the function
 
   public:
     symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, int qualifier) :
@@ -37,6 +37,9 @@ namespace til {
     }
     int qualifier() const {
       return _qualifier;
+    }
+    void qualifier(int qualifier) {
+      _qualifier = qualifier;
     }
     int offset() const {
       return _offset;
