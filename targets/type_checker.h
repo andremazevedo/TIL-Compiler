@@ -3,6 +3,8 @@
 
 #include "targets/basic_ast_visitor.h"
 
+#include <stack>
+
 namespace til {
 
   /**
@@ -10,15 +12,15 @@ namespace til {
    */
   class type_checker: public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
-    std::shared_ptr<til::symbol> _function;
+    std::stack<std::shared_ptr<til::symbol>> _functions;
     basic_ast_visitor *_parent;
 
     std::shared_ptr<cdk::basic_type> _inBlockReturnType = nullptr;
 
   public:
     type_checker(std::shared_ptr<cdk::compiler> compiler, cdk::symbol_table<til::symbol> &symtab, 
-                 std::shared_ptr<til::symbol> function, basic_ast_visitor *parent) :
-        basic_ast_visitor(compiler), _symtab(symtab), _function(function), _parent(parent) {
+                 std::stack<std::shared_ptr<til::symbol>> &functions, basic_ast_visitor *parent) :
+        basic_ast_visitor(compiler), _symtab(symtab), _functions(functions), _parent(parent) {
     }
 
   public:
@@ -54,9 +56,9 @@ namespace til {
 //     HELPER MACRO FOR TYPE CHECKING
 //---------------------------------------------------------------------------
 
-#define CHECK_TYPES(compiler, symtab, function, node) { \
+#define CHECK_TYPES(compiler, symtab, functions, node) { \
   try { \
-    til::type_checker checker(compiler, symtab, function, this); \
+    til::type_checker checker(compiler, symtab, functions, this); \
     (node)->accept(&checker, 0); \
   } \
   catch (const std::string &problem) { \
@@ -65,6 +67,6 @@ namespace til {
   } \
 }
 
-#define ASSERT_SAFE_EXPRESSIONS CHECK_TYPES(_compiler, _symtab, _function, node)
+#define ASSERT_SAFE_EXPRESSIONS CHECK_TYPES(_compiler, _symtab, _functions, node)
 
 #endif

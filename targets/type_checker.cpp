@@ -304,6 +304,17 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node, int
       node->rvalue()->type(node->lvalue()->type());
     }
 
+    // TODO: check if pointers are compatible
+
+    node->type(node->lvalue()->type());
+  }
+  else if (node->lvalue()->is_typed(cdk::TYPE_FUNCTIONAL)) {
+    if (!node->rvalue()->is_typed(cdk::TYPE_FUNCTIONAL)) {
+      throw std::string("wrong assignment to function");
+    }
+
+    // todo: go deeper into cheking the types that compare TYPE_FUNCTIONAL/TYPE_FUNCTIONAL(see if input/output match)
+
     node->type(node->lvalue()->type());
   }
   else {
@@ -320,7 +331,7 @@ void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_program_node(til::program_node *const node, int lvl) {
-  auto symbol = til::make_symbol(node->type(), "_main", false);
+  auto symbol = til::make_symbol(node->type(), "_main", tPUBLIC);
   _symtab.insert("_main", symbol);
   _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted
 }
@@ -374,7 +385,7 @@ void til::type_checker::do_if_else_node(til::if_else_node *const node, int lvl) 
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_function_definition_node(til::function_definition_node *const node, int lvl) {
-  // TODO
+  // EMPTY
 }
 
 void til::type_checker::do_function_call_node(til::function_call_node *const node, int lvl) {
@@ -420,7 +431,7 @@ void til::type_checker::do_function_call_node(til::function_call_node *const nod
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
-  auto function_type = cdk::functional_type::cast(_function->type());
+  auto function_type = cdk::functional_type::cast(_functions.top()->type());
 
   if (node->retval()) {
     if (function_type->output(0)->name() == cdk::TYPE_VOID)
@@ -544,11 +555,11 @@ void til::type_checker::do_variable_declaration_node(til::variable_declaration_n
   }
 
   const std::string &id = node->identifier();
-  auto symbol = til::make_symbol(node->type(), id, node->qualifier() == tFORWARD);
+  auto symbol = til::make_symbol(node->type(), id, node->qualifier());
 
   auto previous = _symtab.find_local(id);
   if (previous) {
-    if (previous->forward()) {
+    if (previous->qualifier() == tFORWARD) {
       // TODO: check compatibility of types
       _symtab.replace(id, symbol);
       _parent->set_new_symbol(symbol); // advise parent that a symbol has been inserted

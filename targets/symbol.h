@@ -10,15 +10,13 @@ namespace til {
   class symbol {
     std::string _name;
     std::shared_ptr<cdk::basic_type> _type;
-    std::vector<std::shared_ptr<cdk::basic_type>> _argument_types;
-    bool _forward; // forward declaration?
-    long _value; // hack!
-    
+    int _qualifier; // qualifiers: public, forward, external, "private" (i.e., none)
     int _offset = 0; // 0 (zero) means global variable/function
+    int _lbl; // label for the function
 
   public:
-    symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, bool forward) :
-        _name(name), _type(type), _forward(forward) {
+    symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, int qualifier) :
+        _name(name), _type(type), _qualifier(qualifier) {
     }
 
     virtual ~symbol() {
@@ -37,20 +35,20 @@ namespace til {
     const std::string &name() const {
       return _name;
     }
-    bool forward() const {
-      return _forward;
-    }
-    long value() const {
-      return _value;
-    }
-    long value(long v) {
-      return _value = v;
+    int qualifier() const {
+      return _qualifier;
     }
     int offset() const {
       return _offset;
     }
-    int offset(int offset) {
-      return _offset = offset;
+    void offset(int offset) {
+      _offset = offset;
+    }
+    int label() const {
+      return _lbl;
+    }
+    void label(int label) {
+      _lbl = label;
     }
     bool function() const {
       return is_typed(cdk::TYPE_FUNCTIONAL);
@@ -60,8 +58,8 @@ namespace til {
     }
   };
 
-  inline auto make_symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, bool forward) {
-    return std::make_shared<symbol>(type, name, forward);
+  inline auto make_symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, int qualifier) {
+    return std::make_shared<symbol>(type, name, qualifier);
   }
 
 } // til
