@@ -15,8 +15,6 @@ namespace til {
     std::stack<std::shared_ptr<til::symbol>> _functions;
     basic_ast_visitor *_parent;
 
-    std::shared_ptr<cdk::basic_type> _inBlockReturnType = nullptr;
-
   public:
     type_checker(std::shared_ptr<cdk::compiler> compiler, cdk::symbol_table<til::symbol> &symtab, 
                  std::stack<std::shared_ptr<til::symbol>> &functions, basic_ast_visitor *parent) :
@@ -29,17 +27,15 @@ namespace til {
     }
 
   protected:
-    void do_UnaryExpression(cdk::unary_operation_node *const node, int lvl);
-    void processBinaryExpression(cdk::binary_operation_node *const node, int lvl);
+    void check_functional_types(std::shared_ptr<cdk::basic_type> type1, std::shared_ptr<cdk::basic_type> type2);
+    void check_reference_types(std::shared_ptr<cdk::basic_type> type1, std::shared_ptr<cdk::basic_type> type2);
+    void do_UnaryIntDoubleExpression(cdk::unary_operation_node *const node, int lvl);
     void do_IntExpression(cdk::binary_operation_node *const node, int lvl);
     void do_IntDoubleExpression(cdk::binary_operation_node *const node, int lvl);
     void do_IntDoublePointerExpression(cdk::binary_operation_node *const node, int lvl, bool sub);
     template<typename T>
     void process_literal(cdk::literal_node<T> *const node, int lvl) {
     }
-  
-  protected:
-    void do_BooleanLogicalExpression(cdk::binary_operation_node * const node, int lvl);
 
   public:
     // do not edit these lines
