@@ -443,6 +443,8 @@ void til::type_checker::do_read_node(til::read_node *const node, int lvl) {
 
 void til::type_checker::do_loop_node(til::loop_node *const node, int lvl) {
   node->condition()->accept(this, lvl + 4);
+  if (!node->condition()->is_typed(cdk::TYPE_INT))
+    throw std::string("expected integer condition");
 }
 
 void til::type_checker::do_stop_node(til::stop_node *const node, int lvl) {
