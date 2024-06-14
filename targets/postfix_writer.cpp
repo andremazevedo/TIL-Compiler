@@ -347,7 +347,7 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node, int l
   auto symbol = _symtab.find(id);
 
   if (symbol->function()) {
-    set_found_symbol(symbol); // advise that a function symbol has been found
+    set_function_symbol(symbol); // advise that a function symbol has been found
   }
   else if (symbol->global()) {
     _pf.ADDR(symbol->name());
@@ -460,7 +460,9 @@ void til::postfix_writer::do_program_node(til::program_node *const node, int lvl
   _offset = 0; // prepare for local variable
 
   _inFunctionBody++;
+  os() << "        ;; before body " << std::endl;
   node->block()->accept(this, lvl);
+  os() << "        ;; after body " << std::endl;
   _inFunctionBody--;
 
   // end the main function
@@ -621,19 +623,16 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
 
   _inFunctionArgs++;
   if (node->arguments()) {
+    std::cout << "function arguments: " << function->name() << std::endl;
     node->arguments()->accept(this, lvl + 4);
   }
   _inFunctionArgs--;
 
   _pf.TEXT();
   _pf.ALIGN();
-  if (function->qualifier() == tPUBLIC) {
+  if (function->qualifier() == tPUBLIC)
     _pf.GLOBAL(function->name(), _pf.FUNC());
-    _pf.LABEL(function->name());
-  }
-  else {
-    _pf.LABEL(mklbl(function->label()));
-  }
+  _pf.LABEL(function->name());
 
   // compute stack size to be reserved for local variables
   frame_size_calculator lsc(_compiler, _symtab, _functions);
@@ -654,41 +653,94 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
   _bodyRetLabel.pop();
 
   _symtab.pop(); // scope of arguments
+
+  set_function_symbol(function); // advise that a function symbol has been defined
 }
 
 void til::postfix_writer::do_function_call_node(til::function_call_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
 
-  std::shared_ptr<til::symbol> function_call;
+  std::shared_ptr<til::symbol> function;
 
   if (node->expression()) {
+    int functionEndLabel = ++_lbl;
+    auto symbol = til::make_symbol(node->expression()->type(), mklbl(++_lbl), tPRIVATE);
+
+    _pf.JMP(mklbl(functionEndLabel));
+
+    _functions.push(symbol);
+
     node->expression()->accept(this, lvl + 2);
 
-    function_call = found_symbol();
-    reset_found_symbol();
+    _functions.pop();
+
+    _pf.LABEL(mklbl(functionEndLabel));
+
+    function = function_symbol();
+    reset_function_symbol();
   }
   else {
     // @ recursive function call
-    function_call = _functions.top();
+    function = _functions.top();
   }
+
+  auto function_type = cdk::functional_type::cast(function->type());
 
   int argsSize = 0;
   if (node->arguments()) {
+    os() << "        ;; before arguments " << std::endl;
+
     for (int i = node->arguments()->size() - 1; i >= 0; i--) {
       auto argument = dynamic_cast<cdk::expression_node*>(node->arguments()->node(i));
-      auto function_call_type = cdk::functional_type::cast(function_call->type());
 
-      argument->accept(this, lvl + 2);
-      if (function_call_type->input(i)->name() == cdk::TYPE_DOUBLE && argument->is_typed(cdk::TYPE_INT))
-        _pf.I2D();
-      argsSize += function_call_type->input(i)->size();
+      if (function_type->input(i)->name() == cdk::TYPE_FUNCTIONAL) {
+        int functionEndLabel = ++_lbl;
+        auto symbol = til::make_symbol(function_type->input(i), mklbl(++_lbl), tPRIVATE);
+
+        _pf.JMP(mklbl(functionEndLabel));
+
+        _functions.push(symbol);
+
+        argument->accept(this, lvl + 2);
+
+        _functions.pop();
+
+        _pf.LABEL(mklbl(functionEndLabel));
+
+        auto argument_function = function_symbol();
+        reset_function_symbol();
+
+        if (argument_function->global())
+          _pf.ADDR(argument_function->name());
+        else
+          _pf.LOCAL(argument_function->offset());
+      }
+      else {
+        argument->accept(this, lvl + 2);
+        if (function_type->input(i)->name() == cdk::TYPE_DOUBLE && argument->is_typed(cdk::TYPE_INT))
+          _pf.I2D();
+      }
+
+      argsSize += function_type->input(i)->size();
     }
+
+    os() << "        ;; after arguments " << std::endl;
   }
 
-  if (function_call->qualifier() == tPUBLIC || function_call->qualifier() == tFORWARD || function_call->qualifier() == tEXTERNAL)
-    _pf.CALL(function_call->name());
-  else
-    _pf.CALL(mklbl(function_call->label()));
+  // if (function_call->qualifier() == tPUBLIC || function_call->qualifier() == tFORWARD || function_call->qualifier() == tEXTERNAL)
+  //   _pf.CALL(function_call->name());
+  // else
+  //   _pf.CALL(mklbl(function_call->label()));
+
+  if (function->global()) {
+    _pf.ADDR(function->name());
+  }
+  else {
+    _pf.LOCAL(function->offset());
+    _pf.LDINT();
+  }
+
+  _pf.BRANCH();  
 
   if (argsSize)
     _pf.TRASH(argsSize);
@@ -740,15 +792,15 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
   ASSERT_SAFE_EXPRESSIONS;
 
   const std::string &id = node->identifier();
-
-  int offset = 0, typesize = node->type()->size(); // in bytes
-  if (_inFunctionBody) {
-    _offset -= typesize;
-    offset = _offset;
-  } 
-  else if (_inFunctionArgs) {
+  std::cout << "variable declaration: " << id  << std::endl;
+  int offset, typesize = node->type()->size(); // in bytes
+  if (_inFunctionArgs) {
     offset = _offset;
     _offset += typesize;
+  } 
+  else if (_inFunctionBody) {
+    _offset -= typesize;
+    offset = _offset;
   } 
   else {
     offset = 0; // global variable
@@ -760,7 +812,11 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
     reset_new_symbol();
   }
 
-  if (_inFunctionBody) {
+  if (_inFunctionArgs) {
+    // if we are dealing with function arguments, then no action is needed
+    std::cout << "function argument: " << id << " , offset: " << offset << std::endl;
+  }
+  else if (_inFunctionBody) {
     // if we are dealing with local variables, then no action is needed
     // unless an initializer exists
     if (node->initializer()) {
@@ -787,9 +843,6 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
         std::cerr << "cannot initialize" << std::endl;
       }
     }
-  }
-  else if (_inFunctionArgs) {
-    // if we are dealing with function arguments, then no action is needed
   }
   else {
     if (node->qualifier() == tEXTERNAL) {
@@ -839,16 +892,22 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
           node->initializer()->accept(this, lvl);
         }
         else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
+          // _functions.push(symbol);
+
+          // symbol->label(++_lbl);
+          // node->initializer()->accept(this, lvl);
+
+          // auto found_function = found_symbol();
+          // if (found_function) {
+          //   symbol->label(found_function->label());
+          //   reset_found_symbol();
+          // }
+
+          // _functions.pop();
+
           _functions.push(symbol);
 
-          symbol->label(++_lbl);
           node->initializer()->accept(this, lvl);
-
-          auto found_function = found_symbol();
-          if (found_function) {
-            symbol->label(found_function->label());
-            reset_found_symbol();
-          }
 
           _functions.pop();
         }
