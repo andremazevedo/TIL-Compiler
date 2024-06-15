@@ -346,7 +346,7 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node, int l
   const std::string &id = node->name();
   auto symbol = _symtab.find(id);
 
-  if (symbol->function()) {
+  if (symbol->is_typed(cdk::TYPE_FUNCTIONAL)) {
     set_function_symbol(symbol); // advise that a function symbol has been found
   }
   else if (symbol->global()) {
@@ -377,28 +377,34 @@ void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node, int lvl) 
 void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
   if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
-    node->lvalue()->accept(this, lvl);
+    node->rvalue()->accept(this, lvl + 2); // determine the new function
 
-    auto lvalue_function = found_symbol();
-    reset_found_symbol();
-
-    int _functionEnd = ++_lbl;
-    _pf.JMP(mklbl(_functionEnd));
-
-    _functions.push(lvalue_function);
-
-    lvalue_function->label(++_lbl);
-    node->rvalue()->accept(this, lvl + 2);
-
-    auto rvlaue_function = found_symbol();
-    if (rvlaue_function) {
-      lvalue_function->label(rvlaue_function->label());
-      reset_found_symbol();
+    auto rvalue_function = function_symbol();
+    if (rvalue_function) {
+      if (rvalue_function->global()) {
+        _pf.ADDR(rvalue_function->name());
+      }
+      else {
+        _pf.LOCAL(rvalue_function->offset());
+        _pf.LDINT();
+      }
+      reset_function_symbol();
     }
 
-    _functions.pop();
+    node->lvalue()->accept(this, lvl); // where to store the value
 
-    _pf.LABEL(mklbl(_functionEnd));
+    auto lvalue_function = function_symbol();
+    if (lvalue_function)
+      reset_function_symbol();
+
+    if (lvalue_function->global()) {
+      lvalue_function->set_name(rvalue_function->name());
+    }
+    else {
+      _pf.DUP32();
+      _pf.LOCAL(lvalue_function->offset());
+      _pf.STINT();
+    }
   }
   else {
     node->rvalue()->accept(this, lvl + 2); // determine the new value
@@ -512,7 +518,6 @@ void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
       std::cerr << "cannot print expression of unknown type" << std::endl;
       return;
     }
-
   }
 
   if (node->newline()) {
@@ -613,11 +618,21 @@ void til::postfix_writer::do_if_else_node(til::if_else_node *const node, int lvl
 void til::postfix_writer::do_function_definition_node(til::function_definition_node *const node, int lvl) {
   ASSERT_SAFE_EXPRESSIONS;
 
-  auto function = _functions.top();
+  auto function = function_symbol();
+  if (function)
+    reset_function_symbol();
+  else
+    function = til::make_symbol(node->type(), mklbl(++_lbl), tPRIVATE);
+
+  _functions.push(function);
+
+  int functionEndLabel = ++_lbl;
+
+  _pf.JMP(mklbl(functionEndLabel));
+
+  _symtab.push(); // scope of args
 
   _bodyRetLabel.push(++_lbl);
- 
-  _symtab.push(); // scope of args
 
   _offset = 8; // prepare for arguments (4: remember to account for return address)
 
@@ -654,6 +669,10 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
 
   _symtab.pop(); // scope of arguments
 
+  _pf.LABEL(mklbl(functionEndLabel));
+
+  _functions.pop();
+
   set_function_symbol(function); // advise that a function symbol has been defined
 }
 
@@ -663,21 +682,11 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
   std::shared_ptr<til::symbol> function;
 
   if (node->expression()) {
-    int functionEndLabel = ++_lbl;
-    auto symbol = til::make_symbol(node->expression()->type(), mklbl(++_lbl), tPRIVATE);
-
-    _pf.JMP(mklbl(functionEndLabel));
-
-    _functions.push(symbol);
-
     node->expression()->accept(this, lvl + 2);
 
-    _functions.pop();
-
-    _pf.LABEL(mklbl(functionEndLabel));
-
     function = function_symbol();
-    reset_function_symbol();
+    if (function)
+      reset_function_symbol();
   }
   else {
     // @ recursive function call
@@ -689,26 +698,15 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
   int argsSize = 0;
   if (node->arguments()) {
     os() << "        ;; before arguments " << std::endl;
-
     for (int i = node->arguments()->size() - 1; i >= 0; i--) {
       auto argument = dynamic_cast<cdk::expression_node*>(node->arguments()->node(i));
 
       if (function_type->input(i)->name() == cdk::TYPE_FUNCTIONAL) {
-        int functionEndLabel = ++_lbl;
-        auto symbol = til::make_symbol(function_type->input(i), mklbl(++_lbl), tPRIVATE);
-
-        _pf.JMP(mklbl(functionEndLabel));
-
-        _functions.push(symbol);
-
         argument->accept(this, lvl + 2);
 
-        _functions.pop();
-
-        _pf.LABEL(mklbl(functionEndLabel));
-
         auto argument_function = function_symbol();
-        reset_function_symbol();
+        if (argument_function)
+          reset_function_symbol();
 
         if (argument_function->global())
           _pf.ADDR(argument_function->name());
@@ -723,33 +721,46 @@ void til::postfix_writer::do_function_call_node(til::function_call_node *const n
 
       argsSize += function_type->input(i)->size();
     }
-
     os() << "        ;; after arguments " << std::endl;
   }
 
-  // if (function_call->qualifier() == tPUBLIC || function_call->qualifier() == tFORWARD || function_call->qualifier() == tEXTERNAL)
-  //   _pf.CALL(function_call->name());
-  // else
-  //   _pf.CALL(mklbl(function_call->label()));
+  if (function->qualifier() == tEXTERNAL) {
+    _pf.CALL(function->name());
 
-  if (function->global()) {
-    _pf.ADDR(function->name());
+    if (argsSize)
+      _pf.TRASH(argsSize);
+
+    if (node->is_typed(cdk::TYPE_DOUBLE)) {
+      _pf.LDFVAL64();
+    }
+    else if (!node->is_typed(cdk::TYPE_VOID)) {
+      _pf.LDFVAL32();
+    }
   }
   else {
-    _pf.LOCAL(function->offset());
-    _pf.LDINT();
-  }
+    if (function->global()) {
+      _pf.ADDR(function->name());
+    }
+    else {
+      _pf.LOCAL(function->offset());
+      _pf.LDINT();
+    }
 
-  _pf.BRANCH();  
+    _pf.BRANCH();  
 
-  if (argsSize)
-    _pf.TRASH(argsSize);
+    if (argsSize)
+      _pf.TRASH(argsSize);
 
-  if (node->is_typed(cdk::TYPE_DOUBLE)) {
-    _pf.LDFVAL64();
-  }
-  else if (!node->is_typed(cdk::TYPE_VOID)) {
-    _pf.LDFVAL32();
+    if (node->is_typed(cdk::TYPE_INT)) {
+      _pf.LDFVAL64();
+      _pf.D2I();
+    }
+    else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+      _pf.LDFVAL64();
+    }
+    else if (!node->is_typed(cdk::TYPE_VOID)) {
+      _pf.LDFVAL32();
+    }
   }
 }
 
@@ -762,24 +773,44 @@ void til::postfix_writer::do_return_node(til::return_node *const node, int lvl) 
 
   // should not reach here without returning a value (if not void)
   if (function_type->output(0)->name() != cdk::TYPE_VOID) {
-    node->retval()->accept(this, lvl);
+    if (function_type->output(0)->name() == cdk::TYPE_FUNCTIONAL) {
+      node->retval()->accept(this, lvl);
 
-    if (function_type->output(0)->name() == cdk::TYPE_INT) {
-      _pf.STFVAL32();
-    }
-    else if (function_type->output(0)->name() == cdk::TYPE_DOUBLE) {
-      if (node->retval()->is_typed(cdk::TYPE_INT))
-        _pf.I2D();
-      _pf.STFVAL64();
-    }
-    else if (function_type->output(0)->name() == cdk::TYPE_STRING) {
-      _pf.STFVAL32();
-    }
-    else if (function_type->output(0)->name() == cdk::TYPE_POINTER) {
+      auto function = function_symbol();
+      if (function)
+        reset_function_symbol();
+
+      if (function->global()) {
+        _pf.ADDR(function->name());
+      }
+      else {
+        _pf.LOCAL(function->offset());
+        _pf.LDINT();
+      }
+
       _pf.STFVAL32();
     }
     else {
-      std::cerr << node->lineno() << ": unknown return type" << std::endl;
+      node->retval()->accept(this, lvl);
+
+      if (function_type->output(0)->name() == cdk::TYPE_INT) {
+        _pf.I2D();
+        _pf.STFVAL64();
+      }
+      else if (function_type->output(0)->name() == cdk::TYPE_DOUBLE) {
+        if (node->retval()->is_typed(cdk::TYPE_INT))
+          _pf.I2D();
+        _pf.STFVAL64();
+      }
+      else if (function_type->output(0)->name() == cdk::TYPE_STRING) {
+        _pf.STFVAL32();
+      }
+      else if (function_type->output(0)->name() == cdk::TYPE_POINTER) {
+        _pf.STFVAL32();
+      }
+      else {
+        std::cerr << node->lineno() << ": unknown return type" << std::endl;
+      }
     }
   }
 
@@ -808,7 +839,7 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
 
   auto symbol = new_symbol();
   if (symbol) {
-    symbol->offset(offset);
+    symbol->set_offset(offset);
     reset_new_symbol();
   }
 
@@ -820,22 +851,43 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
     // if we are dealing with local variables, then no action is needed
     // unless an initializer exists
     if (node->initializer()) {
-      node->initializer()->accept(this, lvl);
       if (node->is_typed(cdk::TYPE_INT)) {
+        node->initializer()->accept(this, lvl);
         _pf.LOCAL(symbol->offset());
         _pf.STINT();
       }
       else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+        node->initializer()->accept(this, lvl);
         if (node->initializer()->is_typed(cdk::TYPE_INT))
           _pf.I2D();
         _pf.LOCAL(symbol->offset());
         _pf.STDOUBLE();
       }
       else if (node->is_typed(cdk::TYPE_STRING)) {
+        node->initializer()->accept(this, lvl);
         _pf.LOCAL(symbol->offset());
         _pf.STINT(); 
       }
       else if (node->is_typed(cdk::TYPE_POINTER)) {
+        node->initializer()->accept(this, lvl);
+        _pf.LOCAL(symbol->offset());
+        _pf.STINT();
+      }
+      else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
+        node->initializer()->accept(this, lvl);
+
+        auto function = function_symbol();
+        if (function) {
+          if (function->global()) {
+            _pf.ADDR(function->name());
+          }
+          else {
+            _pf.LOCAL(function->offset());
+            _pf.LDINT();
+          }
+          reset_function_symbol();
+        }
+
         _pf.LOCAL(symbol->offset());
         _pf.STINT();
       }
@@ -892,24 +944,13 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
           node->initializer()->accept(this, lvl);
         }
         else if (node->is_typed(cdk::TYPE_FUNCTIONAL)) {
-          // _functions.push(symbol);
-
-          // symbol->label(++_lbl);
-          // node->initializer()->accept(this, lvl);
-
-          // auto found_function = found_symbol();
-          // if (found_function) {
-          //   symbol->label(found_function->label());
-          //   reset_found_symbol();
-          // }
-
-          // _functions.pop();
-
-          _functions.push(symbol);
+          set_function_symbol(symbol);
 
           node->initializer()->accept(this, lvl);
 
-          _functions.pop();
+          auto function = function_symbol();
+          if (function)
+            reset_function_symbol();
         }
         else {
           std::cerr << node->lineno() << ": '" << id << "' has unexpected initializer" << std::endl;

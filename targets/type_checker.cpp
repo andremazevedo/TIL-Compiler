@@ -564,6 +564,12 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 
       check_reference_types(function_type->output(0), node->retval()->type());
     }
+    else if (function_type->output(0)->name() == cdk::TYPE_FUNCTIONAL) {
+      if (!node->retval()->is_typed(cdk::TYPE_FUNCTIONAL))
+        throw std::string("wrong type for return value (function expected).");
+
+      check_functional_types(function_type->output(0), node->retval()->type());
+    }
     else {
       throw std::string("unknown type for return value.");
     }

@@ -12,7 +12,6 @@ namespace til {
     std::shared_ptr<cdk::basic_type> _type;
     int _qualifier; // qualifiers: public, forward, external, "private" (i.e., none)
     int _offset = 0; // 0 (zero) means global variable/function
-    int _lbl = 0; // label for the function
 
   public:
     symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, int qualifier) :
@@ -35,6 +34,9 @@ namespace til {
     const std::string &name() const {
       return _name;
     }
+    void set_name(const std::string &name) {
+      _name = name;
+    }
     int qualifier() const {
       return _qualifier;
     }
@@ -44,17 +46,8 @@ namespace til {
     int offset() const {
       return _offset;
     }
-    void offset(int offset) {
+    void set_offset(int offset) {
       _offset = offset;
-    }
-    int label() const {
-      return _lbl;
-    }
-    void label(int label) {
-      _lbl = label;
-    }
-    bool function() const {
-      return is_typed(cdk::TYPE_FUNCTIONAL);
     }
     bool global() const {
       return _offset == 0;

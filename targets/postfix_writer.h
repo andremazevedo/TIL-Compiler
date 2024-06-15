@@ -23,7 +23,7 @@ namespace til {
     int _inFunctionArgs, _inFunctionBody;
     std::vector<int> _loopTest, _loopEnd; // for stop/next
     std::stack<std::shared_ptr<til::symbol>> _functions; // for keeping track of the current functions
-    std::shared_ptr<til::symbol> _found_symbol; // last symbol found in symbol table
+    std::shared_ptr<til::symbol> _function_symbol; // last function symbol found in symbol table or defined
     int _offset; // current framepointer offset (0 means no vars defined)
 
     std::stack<int> _bodyRetLabel; // where to jump when a return occurs
@@ -34,8 +34,8 @@ namespace til {
   public:
     postfix_writer(std::shared_ptr<cdk::compiler> compiler, cdk::symbol_table<til::symbol> &symtab,
                    cdk::basic_postfix_emitter &pf) :
-        basic_ast_visitor(compiler), _symtab(symtab), _inFunctionArgs(0), _inFunctionBody(0), _found_symbol(nullptr), 
-        _offset(0), _pf(pf), _lbl(0) {
+        basic_ast_visitor(compiler), _symtab(symtab), _inFunctionArgs(0), _inFunctionBody(0), _offset(0), 
+        _pf(pf), _lbl(0) {
     }
 
   public:
@@ -44,16 +44,16 @@ namespace til {
     }
 
   public:
-    std::shared_ptr<til::symbol> found_symbol() {
-      return _found_symbol;
+    std::shared_ptr<til::symbol> function_symbol() {
+      return _function_symbol;
     }
 
-    void set_found_symbol(std::shared_ptr<til::symbol> symbol) {
-      _found_symbol = symbol;
+    void set_function_symbol(std::shared_ptr<til::symbol> symbol) {
+      _function_symbol = symbol;
     }
 
-    void reset_found_symbol() {
-      _found_symbol = nullptr;
+    void reset_function_symbol() {
+      _function_symbol = nullptr;
     }
 
   private:
