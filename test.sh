@@ -5,18 +5,15 @@ TESTS_DIR=auto-tests
 EXPECTED_DIR=$TESTS_DIR/expected
 
 # Color codes
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+PASS='\033[0;32mPASSED\033[0m'
+FAIL='\033[0;31mFAILED\033[0m'
 
 # Log file
 LOGFILE=log.md
 
-# Color HTML
-SPAN_PASS="<span style='color: green;'>"
-SPAN_FAIL="<span style='color: red;'>"
-SPAN_END="</span>"
-BR="<br />"
+# Tex Color to md
+LOG_PASS='$\\color{green}{\\textbf{PASSED}}$'
+LOG_FAIL='$\\color{red}{\\textbf{FAILED}}$'
 
 # Determine if a specific test file was provided as an argument
 if [ $# -eq 1 ]; then
@@ -30,7 +27,7 @@ fi
 # Clear previous log
 if $ALL_TESTS
 then
-  echo "" > $LOGFILE
+  rm -f $LOGFILE
 fi
 
 # Compile the project
@@ -70,10 +67,10 @@ do
   fi
 
   if [ $? -ne 0 ]; then
-    echo -e "Test $test_name: ${RED}FAILED${NC}: Failed to generate assembly"
+    echo -e "Test $test_name: $FAIL: Failed to generate assembly"
     if $ALL_TESTS
     then
-      echo "Test $test_name: ${SPAN_FAIL}FAILED${SPAN_END}: Failed to generate assembly${BR}" >> $LOGFILE
+      echo "Test $test_name: $LOG_FAIL: Failed to generate assembly" >> $LOGFILE
       cleanup_files
     fi
     continue
@@ -88,10 +85,10 @@ do
   fi
 
   if [ $? -ne 0 ]; then
-    echo -e "Test $test_name: ${RED}FAILED${NC}: Assembly failed"
+    echo -e "Test $test_name: $FAIL: Assembly failed"
     if $ALL_TESTS
     then
-      echo "Test $test_name: ${SPAN_FAIL}FAILED${SPAN_END}: Assembly failed${BR}" >> $LOGFILE
+      echo "Test $test_name: $LOG_FAIL: Assembly failed" >> $LOGFILE
       cleanup_files
     fi
     continue
@@ -106,10 +103,10 @@ do
   fi
 
   if [ $? -ne 0 ]; then
-    echo -e "Test $test_name: ${RED}FAILED${NC}: Linking failed"
+    echo -e "Test $test_name: $FAIL: Linking failed"
     if $ALL_TESTS
     then
-      echo "Test $test_name: ${SPAN_FAIL}FAILED${SPAN_END}: Linking failed${BR}" >> $LOGFILE
+      echo "Test $test_name: $LOG_FAIL: Linking failed  " >> $LOGFILE
       cleanup_files
     fi
     continue
@@ -119,10 +116,10 @@ do
   ./$exec_file > $out_file
   exec_status=$?
   if [ $exec_status -ne 0 ] && [ $exec_status -ne 1 ]; then
-    echo -e "Test $test_name: ${RED}FAILED${NC}: Execution failed"
+    echo -e "Test $test_name: $FAIL: Execution failed"
     if $ALL_TESTS
     then
-      echo "Test $test_name: ${SPAN_FAIL}FAILED${SPAN_END}: Execution failed${BR}" >> $LOGFILE
+      echo "Test $test_name: $LOG_FAIL: Execution failed  " >> $LOGFILE
       cleanup_files
     fi
     continue
@@ -131,16 +128,16 @@ do
   # Compare the output with the expected output
   diff -iwub =(tr -d '[:space:]' < $out_file) =(tr -d '[:space:]' < $EXPECTED_DIR/$test_name.out) > /dev/null
   if [ $? -eq 0 ]; then
-    echo -e "Test $test_name: ${GREEN}PASSED${NC}"
+    echo -e "Test $test_name: $PASS"
     if $ALL_TESTS
     then
-      echo "Test $test_name: ${SPAN_PASS}PASSED${SPAN_END}${BR}" >> $LOGFILE
+      echo "Test $test_name: $LOG_PASS  " >> $LOGFILE
     fi
   else
-    echo -e "Test $test_name: ${RED}FAILED${NC}: Output mismatch"
+    echo -e "Test $test_name: $FAIL: Output mismatch"
     if $ALL_TESTS
     then
-      echo "Test $test_name: ${SPAN_FAIL}FAILED${SPAN_END}: Output mismatch${BR}" >> $LOGFILE
+      echo "Test $test_name: $LOG_FAIL: Output mismatch$  " >> $LOGFILE
     fi
   fi
 
