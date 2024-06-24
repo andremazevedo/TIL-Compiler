@@ -637,10 +637,8 @@ void til::postfix_writer::do_function_definition_node(til::function_definition_n
   _offset = 8; // prepare for arguments (4: remember to account for return address)
 
   _inFunctionArgs++;
-  if (node->arguments()) {
-    std::cout << "function arguments: " << function->name() << std::endl;
+  if (node->arguments())
     node->arguments()->accept(this, lvl + 4);
-  }
   _inFunctionArgs--;
 
   _pf.TEXT();
@@ -823,7 +821,7 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
   ASSERT_SAFE_EXPRESSIONS;
 
   const std::string &id = node->identifier();
-  std::cout << "variable declaration: " << id  << std::endl;
+
   int offset, typesize = node->type()->size(); // in bytes
   if (_inFunctionArgs) {
     offset = _offset;
@@ -845,7 +843,6 @@ void til::postfix_writer::do_variable_declaration_node(til::variable_declaration
 
   if (_inFunctionArgs) {
     // if we are dealing with function arguments, then no action is needed
-    std::cout << "function argument: " << id << " , offset: " << offset << std::endl;
   }
   else if (_inFunctionBody) {
     // if we are dealing with local variables, then no action is needed

@@ -97,9 +97,9 @@ do
   # Link the object file
   if $ALL_TESTS
   then
-    ld -melf_i386 -o $exec_file $obj_file -lrts > /dev/null 2>&1
+    ld -melf_i386 -o $exec_file $obj_file -L$HOME/compiladores/root/usr/lib -lrts > /dev/null 2>&1
   else
-    ld -melf_i386 -o $exec_file $obj_file -lrts
+    ld -melf_i386 -o $exec_file $obj_file -L$HOME/compiladores/root/usr/lib -lrts
   fi
 
   if [ $? -ne 0 ]; then
