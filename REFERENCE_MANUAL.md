@@ -179,14 +179,14 @@ The grammar of the language is summarized below. It is considered that elements 
 | *main-program*            | → | **(** **program** ⟨ *declaration* ⟩ ⟨ *instruction* ⟩ **)** |
 | *function*                | → | **(** **function** **(** *type* **)** ⟨ *declaration* ⟩ ⟨ *instruction* ⟩ **)** |
 |                           | → | **(** **function** **(** *type* *declarations* **)** ⟨ *declaration* ⟩ ⟨ *instruction* ⟩ **)** |
-| *type*                    | → | **int** | **double** | **string** | **void** | *type* **!** | *function-type* |
+| *type*                    | → | **int** \| **double** \| **string** \| **void** \| *type* **!** \| *function-type* |
 | *function-type*           | → | **(** *type* **)**                                    |
 |                           | → | **(** *type* **(** *types* **)** **)**               |
 | *types*                   | → | *type* ⟨ *type* ⟩                                     |
 | *block*                   | → | **(** **block** ⟨ *declaration* ⟩ ⟨ *instruction* ⟩ **)** |
-| *instruction*             | → | *expression* | **(** **print** *expressions* **)** | **(** **println** *expressions* **)** |
-|                           | → | **(** **stop** [ *integer-literal* ] **)** | **(** **next** [ *integer-literal* ] **)** | **(** **return** [ *expression* ] **)** |
-|                           | → | *conditional-instruction* | *iteration-instruction* | *block* |
+| *instruction*             | → | *expression* \| **(** **print** *expressions* **)** \| **(** **println** *expressions* **)** |
+|                           | → | **(** **stop** [ *integer-literal* ] **)** \| **(** **next** [ *integer-literal* ] **)** \| **(** **return** [ *expression* ] **)** |
+|                           | → | *conditional-instruction* \| *iteration-instruction* \| *block* |
 | *conditional-instruction* | → | **(** **if** *expression* *instruction* [ *instruction* ] **)** |
 | *iteration-instruction*   | → | **(** **loop** *expression* *instruction* **)**       |
 | *expressions*             | → | *expression* ⟨ *expression* ⟩                         |
@@ -393,7 +393,7 @@ The operation of reading an integer or real value is indicated by the operator *
 
 Examples: **(set a (read))** (reading into **a**, according to the type of **a**), **(f (read))** (reading as a function argument, according to the type of that argument), **(println (read))** (reading and printing, reading and printing an integer value), **(@ (read))** (recursive function call with an argument read from input, according to the type of the current function's argument).
 
-### Functions {#functions-2} 
+### Functions 
 
 Functions (pointers or their code: not to be confused with function calls) can be used as expressions, typed as functions, i.e., pointers to functions (even when a pointer is not explicitly used).
 
