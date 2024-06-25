@@ -72,7 +72,7 @@ To build the TIL compiler, follow these steps:
 3. **Clone the repository**:
    ```
    git clone https://github.com/andremazevedo/TIL-Compiler.git
-   cd TIL-compiler
+   cd TIL-Compiler
    ```
 
 4. **Build the compiler**:
@@ -111,16 +111,12 @@ To compile and run a TIL program, follow these steps:
 
 To ensure the correctness of the TIL compiler, you can run automated tests provided in the `auto-tests` directory. These tests include example TIL programs and their expected output.
 
-### Run a Single Test
-
-To run a specific test in the `auto-tests` directory.
+**Run a single test**:
 ```sh
 ./test.sh auto-tests/A-01-1-N-ok.til
 ```
 
-### Run All Tests
-
-To run all tests in the `auto-tests` directory, use the following command:
+**Run all tests**:
 ```sh
 ./test.sh
 ```
