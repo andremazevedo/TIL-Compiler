@@ -47,64 +47,65 @@ Besides the modules that carry the programmer's code, translated into machine co
 
 To build the TIL compiler, follow these steps:
 
-- **Install the required tools**:
-  Ensure that `flex`, `bison`, and `yasm` are installed on your system. For a Debian-based system, you can use:
-  ```sh
-  sudo apt install flex bison yasm
-  ```
+1. **Install the required tools**:
+   Ensure that `flex`, `bison`, and `yasm` are installed on your system. For a Debian-based system, you can use:
+   ```
+   sudo apt install flex bison yasm
+   ```
 
-- **Install the CDK and RTS libraries**:
-  The CDK and RTS libraries supporting the development of the project are required.
-  ```sh
-  wget https://web.tecnico.ulisboa.pt/~ist192424/Libcdk19-202403010000.tar.bz2 
-  tar xvf Libcdk19-202403010000.tar.bz2
-  cd libcdk19-202403010000
-  make install
-  ```
-  ```sh
-  wget https://web.tecnico.ulisboa.pt/~ist192424/Librts5-202103031636.tar.bz2
-  tar xvf Librts5-202103031636.tar.bz2
-  cd librts5-202103031636
-  make install
-  ```
+2. **Install the CDK and RTS libraries**:
+   The CDK and RTS libraries supporting the development of the project are required.
+   ```
+   wget https://web.tecnico.ulisboa.pt/~ist192424/Libcdk19-202403010000.tar.bz2 
+   tar xvf Libcdk19-202403010000.tar.bz2
+   cd libcdk19-202403010000
+   make install
+   cd ..
 
-- **Clone the repository**:
-  ```sh
-  git clone https://github.com/andremazevedo/TIL.git
-  cd TIL-compiler
-  ```
+   wget https://web.tecnico.ulisboa.pt/~ist192424/Librts5-202103031636.tar.bz2
+   tar xvf Librts5-202103031636.tar.bz2
+   cd librts5-202103031636
+   make install
+   cd ..
+   ```
 
-- **Build the compiler**:
-  ```sh
-  make
-  ```
+3. **Clone the repository**:
+   ```
+   git clone https://github.com/andremazevedo/TIL-Compiler.git
+   cd TIL-compiler
+   ```
+
+4. **Build the compiler**:
+   ```
+   make
+   ```
 
 ## TIL Program Compilation
 
 To compile and run a TIL program, follow these steps:
 
-- **Compile the source code**:
-  Compile the TIL source code into assembly code.
-  ```sh
-  ./til example.til
-  ```
+1. **Compile the source code**:
+   Compile the TIL source code into assembly code.
+   ```
+   ./til example.til
+   ```
 
-- **Compile the assembly code**:
-  Use `yasm` to convert the assembly code into an object file.
-  ```sh
-  yasm -felf32 -o example.o example.asm
-  ```
+2. **Compile the assembly code**:
+   Use `yasm` to convert the assembly code into an object file.
+   ```
+   yasm -felf32 -o example.o example.asm
+   ```
 
-- **Produce the executable**:
-  Link the object file to produce the final executable.
-  ```sh
-  ld -melf_i386 -o example example.o -L$HOME/compiladores/root/usr/lib -lrts
-  ```
+3. **Produce the executable**:
+   Link the object file to produce the final executable.
+   ```
+   ld -melf_i386 -o example example.o -L$HOME/compiladores/root/usr/lib -lrts
+   ```
 
-- **Run the executable**:
-    ```sh
-    ./example
-    ```
+4. **Run the executable**:
+   ```
+   ./example
+   ```
 
 ## Automated Tests
 
